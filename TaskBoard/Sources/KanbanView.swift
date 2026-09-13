@@ -711,7 +711,8 @@ struct KanbanView: View {
 
     /// 盤面ぶんの絞り込みと並べ替えを1回で済ませ、ステータスごとに振り分ける。
     private func groupedTasks() -> [Status: [Task]] {
-        let filter = Filter(period: state.period, profileIDs: state.activeProfiles,
+        let filter = Filter(period: state.period,
+                            profileIDs: state.visibleProfiles(of: store.doc.profiles.map(\.id)),
                             calendar: settings.calendar, sort: settings.sortRule,
                             profileOrder: store.doc.profiles.map(\.id))
         var grouped: [Status: [Task]] = [:]

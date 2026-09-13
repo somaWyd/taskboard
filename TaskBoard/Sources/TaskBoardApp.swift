@@ -6,7 +6,24 @@ final class AppState {
     var period: Period = Period(rawValue: UserDefaults.standard.string(forKey: "lastPeriod") ?? "") ?? .today {
         didSet { UserDefaults.standard.set(period.rawValue, forKey: "lastPeriod") }
     }
-    var activeProfiles: Set<String> = []   // 空 = すべて
+    /// 隠しているプロファイル。ここに無いものは表示する。
+    /// 新しく作ったプロファイルは自動で表示されるので、この持ち方にしている。
+    var hiddenProfiles: Set<String> = Set(UserDefaults.standard
+        .stringArray(forKey: "hiddenProfiles") ?? []) {
+        didSet { UserDefaults.standard.set(Array(hiddenProfiles), forKey: "hiddenProfiles") }
+    }
+
+    func isVisible(_ id: String) -> Bool { !hiddenProfiles.contains(id) }
+
+    func toggleProfile(_ id: String) {
+        if hiddenProfiles.contains(id) { hiddenProfiles.remove(id) }
+        else { hiddenProfiles.insert(id) }
+    }
+
+    /// 絞り込みに渡す「見えているプロファイル」。全部隠していれば空集合。
+    func visibleProfiles(of all: [String]) -> Set<String> {
+        Set(all.filter(isVisible))
+    }
     var editing: Task?
     var showingNew = false
 }

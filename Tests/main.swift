@@ -80,35 +80,30 @@ expectCol("Done の中央", CGPoint(x: 540, y: 300), .done)
 expectCol("盤の遥か下", CGPoint(x: 320, y: 900), nil)
 print(f2 == 0 ? "\n列の判定: 全て通過" : "\n列の判定: 失敗 \(f2) 件")
 
-// --- サイドバーのプロファイル表示切替 ---
-print("\n--- プロファイルの表示切替 ---")
-let all4 = ["a", "b", "c", "d"]
+// --- プロファイルの絞り込み（nil=全部 / 集合=そのぶんだけ / 空=0件） ---
+print("\n--- プロファイルの絞り込み ---")
+let ps = (0..<3).map {
+    Profile(id: "p\($0)", name: "p\($0)", symbol: "c", colorHex: "#0A84FF", defaultTime: "09:00")
+}
+let sample = (0..<6).map { i in
+    Task(title: "t\(i)", status: .inbox, profileID: ps[i % 3].id, due: Date())
+}
 var f3 = 0
-func expectSet(_ label: String, _ got: Set<String>, _ want: Set<String>) {
+func expectCount(_ label: String, _ ids: Set<String>?, _ want: Int) {
+    var f = Filter(period: .all, calendar: .current, sort: .dateManual,
+                   profileOrder: ps.map(\.id))
+    f.profileIDs = ids
+    let got = f.count(sample)
     let ok = got == want
     if !ok { f3 += 1 }
-    print("\(ok ? "OK  " : "NG  ") \(label): \(got.sorted())")
+    print("\(ok ? "OK  " : "NG  ") \(label): \(got)件")
 }
-expectSet("全部表示中にaを押す → aだけ",
-          ProfileVisibility.toggle(active: [], clicked: "a", all: all4), ["a"])
-expectSet("aだけ表示中にaを押す → a以外ぜんぶ",
-          ProfileVisibility.toggle(active: ["a"], clicked: "a", all: all4), ["b", "c", "d"])
-expectSet("a,bを表示中にbを押す → aだけ",
-          ProfileVisibility.toggle(active: ["a", "b"], clicked: "b", all: all4), ["a"])
-expectSet("a,bを表示中にcを押す → a,b,c",
-          ProfileVisibility.toggle(active: ["a", "b"], clicked: "c", all: all4), ["a", "b", "c"])
-expectSet("a,b,cを表示中にdを押す → 全部表示（空集合）",
-          ProfileVisibility.toggle(active: ["a", "b", "c"], clicked: "d", all: all4), [])
-expectSet("b,c,dを表示中にaを押す → 全部表示（空集合）",
-          ProfileVisibility.toggle(active: ["b", "c", "d"], clicked: "a", all: all4), [])
-expectSet("プロファイルが1つだけなら全部表示のまま",
-          ProfileVisibility.toggle(active: [], clicked: "a", all: ["a"]), [])
-expectSet("1つだけのプロファイルを隠そうとしても維持",
-          ProfileVisibility.toggle(active: ["a"], clicked: "a", all: ["a"]), ["a"])
-expectSet("知らないIDは無視",
-          ProfileVisibility.toggle(active: ["a"], clicked: "z", all: all4), ["a"])
-print(f3 == 0 ? "\nプロファイル切替: 全て通過" : "\nプロファイル切替: 失敗 \(f3) 件")
-
+expectCount("nil → 絞らない", nil, 6)
+expectCount("p0 だけ表示", ["p0"], 2)
+expectCount("p0 と p1 を表示", ["p0", "p1"], 4)
+expectCount("全部表示", ["p0", "p1", "p2"], 6)
+expectCount("全部非表示 → 0件", [], 0)
+print(f3 == 0 ? "\nプロファイルの絞り込み: 全て通過" : "\nプロファイルの絞り込み: 失敗 \(f3) 件")
 
 // --- サブタスクの行が判定に含まれているか（今回の不具合の再発防止） ---
 print("\n--- 親と子が混ざった列 ---")

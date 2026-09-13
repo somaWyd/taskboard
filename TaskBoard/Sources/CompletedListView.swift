@@ -57,7 +57,8 @@ struct CompletedListView: View {
     }
 
     private var groups: [(String, [Task])] {
-        let filter = Filter(period: .completed, profileIDs: state.activeProfiles,
+        let filter = Filter(period: .completed,
+                            profileIDs: state.visibleProfiles(of: store.doc.profiles.map(\.id)),
                             calendar: settings.calendar, sort: settings.sortRule,
                             profileOrder: store.doc.profiles.map(\.id))
         let done = filter.apply(store.doc.tasks, includeSubtasks: true)

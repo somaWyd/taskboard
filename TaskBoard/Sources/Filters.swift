@@ -35,7 +35,8 @@ enum Period: String, CaseIterable, Identifiable, Codable {
 
 struct Filter {
     var period: Period = .today
-    var profileIDs: Set<String> = []      // 空 = 全プロファイル
+    /// nil = プロファイルで絞らない。集合を渡すとそのぶんだけ（空集合なら0件）
+    var profileIDs: Set<String>? = nil
     var calendar: Calendar = .current
     var sort: SortRule = .dateManual
     var profileOrder: [String] = []
@@ -51,7 +52,7 @@ struct Filter {
 
     private func matches(_ t: Task) -> Bool {
         if t.isSubtask { return false }
-        if !profileIDs.isEmpty && !profileIDs.contains(t.profileID) { return false }
+        if let profileIDs, !profileIDs.contains(t.profileID) { return false }
         switch period {
         case .completed: return t.status == .done
         case .all: return true
@@ -66,7 +67,7 @@ struct Filter {
     }
 
     private func matchesIgnoringNesting(_ t: Task) -> Bool {
-        if !profileIDs.isEmpty && !profileIDs.contains(t.profileID) { return false }
+        if let profileIDs, !profileIDs.contains(t.profileID) { return false }
         switch period {
         case .completed: return t.status == .done
         case .all: return true
@@ -126,6 +127,7 @@ enum SortRule: String, CaseIterable, Identifiable, Codable {
         }
     }
 }
+
 
 
 extension Array {

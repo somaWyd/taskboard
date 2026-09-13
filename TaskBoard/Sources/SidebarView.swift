@@ -70,7 +70,7 @@ struct SidebarView: View {
     }
 
     private func profileRow(_ profile: Profile) -> some View {
-        let on = state.activeProfiles.isEmpty || state.activeProfiles.contains(profile.id)
+        let on = state.isVisible(profile.id)
         let isDefault = settings.defaultProfileID == profile.id
         return HStack(spacing: 9) {
             Image(systemName: profile.symbol)
@@ -106,7 +106,7 @@ struct SidebarView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
-                .help(on ? "このプロファイルを隠す" : "表示する")
+                .help(on ? "隠す" : "表示する")
             } else {
                 Text("\(profileCount(profile.id))")
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
@@ -128,8 +128,11 @@ struct SidebarView: View {
         Button("「\(profile.name)」を編集…") { editing = profile }
         Button("デフォルトにする") { settings.defaultProfileID = profile.id }
             .disabled(settings.defaultProfileID == profile.id)
-        Button("このプロファイルだけ表示") { state.activeProfiles = [profile.id] }
-        Button("すべて表示") { state.activeProfiles = [] }
+        Button("このプロファイルだけ表示") {
+            state.hiddenProfiles = Set(store.doc.profiles.map(\.id)).subtracting([profile.id])
+        }
+        Button("すべて表示") { state.hiddenProfiles = [] }
+        Button("すべて非表示") { state.hiddenProfiles = Set(store.doc.profiles.map(\.id)) }
         Divider()
         Button("プロファイルを追加…") { editing = newProfile() }
         Button("削除", role: .destructive) { remove(profile) }
@@ -200,26 +203,23 @@ struct SidebarView: View {
     private func remove(_ profile: Profile) {
         guard store.doc.profiles.count > 1 else { return }
         store.doc.profiles.removeAll { $0.id == profile.id }
-        state.activeProfiles.remove(profile.id)
+        state.hiddenProfiles.remove(profile.id)
         store.save()
     }
 
-    private func toggle(_ id: String) {
-        state.activeProfiles = ProfileVisibility.toggle(
-            active: state.activeProfiles,
-            clicked: id,
-            all: store.doc.profiles.map(\.id))
-    }
+    private func toggle(_ id: String) { state.toggleProfile(id) }
 
     private func count(_ period: Period) -> Int {
-        filter(period: period, profiles: state.activeProfiles).count(store.doc.tasks)
+        filter(period: period,
+               profiles: state.visibleProfiles(of: store.doc.profiles.map(\.id)))
+            .count(store.doc.tasks)
     }
 
     private func profileCount(_ id: String) -> Int {
         filter(period: state.period, profiles: [id]).count(store.doc.tasks)
     }
 
-    private func filter(period: Period, profiles: Set<String>) -> Filter {
+    private func filter(period: Period, profiles: Set<String>?) -> Filter {
         Filter(period: period, profileIDs: profiles, calendar: settings.calendar,
                sort: settings.sortRule, profileOrder: store.doc.profiles.map(\.id))
     }
