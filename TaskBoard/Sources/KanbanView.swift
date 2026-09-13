@@ -1,12 +1,12 @@
 import SwiftUI
 
-/// 盤面の大きさ。カードの座標と同じ仕組み（PreferenceKey）で拾う。
-/// onChange(of: geo.size) では初回の値のまま更新されないことがあった。
-private struct BoardSizeKey: PreferenceKey {
-    static var defaultValue: CGSize = .zero
-    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
-        let next = nextValue()
-        if next != .zero { value = next }
+/// 列の横幅。カードと同じ場所（スクロールの中身）で測る。
+/// 列の外側で測ると、SwiftUI が最小サイズを求める計算のときの値に
+/// 上書きされ、実際の画面と食い違ったまま残ることがある。
+private struct ColumnProbes: PreferenceKey {
+    static var defaultValue: [Status: CGRect] = [:]
+    static func reduce(value: inout [Status: CGRect], nextValue: () -> [Status: CGRect]) {
+        value.merge(nextValue()) { _, new in new }
     }
 }
 
@@ -45,7 +45,7 @@ struct KanbanView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(AppState.self) private var state
 
-    @State private var boardSize: CGSize = .zero
+    @State private var probes: [Status: CGRect] = [:]
     @State private var dragging: Task?
     @State private var dragModel = DragPointModel()
     @State private var grabOffset: CGSize = .zero
@@ -86,29 +86,19 @@ struct KanbanView: View {
             if !selection.isEmpty { withAnimation(Motion.quick) { selection = [] } }
             else if composing != nil { cancelComposing() }
         }
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: BoardSizeKey.self, value: geo.size)
-            }
-        }
-        .onPreferenceChange(BoardSizeKey.self) { boardSize = $0 }
+        .onPreferenceChange(ColumnProbes.self) { probes = $0 }
         .onPreferenceChange(CardFrames.self) { cardFrames = $0 }
         .onChange(of: state.period) { _, _ in selection = []; composing = nil }
     }
 
-    /// 列の矩形。HStack の余白14pt・間隔12pt・等幅という配置から計算する。
-    /// 実測値を別に集めると、片方だけ古くなったときに気づけない。
+    /// 列の当たり判定に使う矩形。
+    /// 横幅は実測した中身の幅に左右の余白10ptを足したもの。
+    /// 縦は「その列の上端から下は全部」とみなす（列は画面の下まで伸びているため）。
     private func columnRects() -> [Status: CGRect] {
-        let cols = visibleColumns
-        guard !cols.isEmpty, boardSize.width > 0 else { return [:] }
-        let pad: CGFloat = 14, gap: CGFloat = 12
-        let width = (boardSize.width - pad * 2 - gap * CGFloat(cols.count - 1))
-            / CGFloat(cols.count)
-        guard width > 0 else { return [:] }
         var rects: [Status: CGRect] = [:]
-        for (i, status) in cols.enumerated() {
-            rects[status] = CGRect(x: pad + (width + gap) * CGFloat(i), y: pad,
-                                   width: width, height: max(boardSize.height - pad * 2, 0))
+        for (status, probe) in probes where probe.width > 0 {
+            rects[status] = CGRect(x: probe.minX - 10, y: probe.minY - 44,
+                                   width: probe.width + 20, height: 100_000)
         }
         return rects
     }
@@ -126,6 +116,14 @@ struct KanbanView: View {
             GeometryReader { geo in
                 ScrollView {
                     LazyVStack(spacing: 10) {
+                        Color.clear.frame(height: 0)
+                            .background {
+                                GeometryReader { g in
+                                    Color.clear.preference(
+                                        key: ColumnProbes.self,
+                                        value: [status: g.frame(in: .named("board"))])
+                                }
+                            }
                         ForEach(layout.rows) { row in
                             if row.showsInsertionLine,
                                drop == .insert(status, row.insertBefore) { insertionLine }
@@ -327,7 +325,10 @@ struct KanbanView: View {
         session = made
         grabOffset = made.grabOffset
         withAnimation(Motion.lift) { dragging = task }
-        DragLog.begin(made, missingFrames: missing, boardSize: boardSize, start: start)
+        DragLog.begin(made, missingFrames: missing,
+                      boardSize: CGSize(width: rects.values.map(\.maxX).max() ?? 0,
+                                        height: 0),
+                      start: start)
         return made
     }
 

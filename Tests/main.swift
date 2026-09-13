@@ -237,4 +237,35 @@ let card = CGRect(x: r.minX + 10, y: r.minY + 42, width: r.width - 20, height: 6
 checkCols("カードは列の内側に収まる", r.contains(card))
 print(f7 == 0 ? "\n列の矩形: 全て通過" : "\n列の矩形: 失敗 \(f7) 件")
 
-exit((failures + f2 + f3 + f4 + f5 + f6 + f7) == 0 ? 0 : 1)
+
+// --- 箱の中ならどこでもその列に入るか（縦位置に依存しない） ---
+print("\n--- 箱の中はどこでも入る ---")
+// 実際の運用と同じ形: 縦は「上端から下は全部」とみなす
+func box(_ x: CGFloat, _ w: CGFloat) -> CGRect {
+    CGRect(x: x, y: 14, width: w, height: 100_000)
+}
+let wide3 = BoardDrag(task: task("drag"), grabOffset: .zero, cardWidth: 200,
+                      columns: [.inbox: box(14, 556), .next: box(582, 556),
+                                .done: box(1150, 556)],
+                      order: [.inbox: [], .next: [], .done: []],
+                      parentCount: [.inbox: 0, .next: 0, .done: 0])
+var f8 = 0
+func expectBox(_ label: String, _ p: CGPoint, _ want: Status?) {
+    var got: Status? = nil
+    if case .insert(let s, _)? = wide3.drop(at: p) { got = s }
+    let ok = got == want
+    if !ok { f8 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label): \(String(describing: got))")
+}
+for y in [20.0, 200.0, 600.0, 1000.0, 3000.0] {
+    expectBox("Next の中央 y=\(Int(y))", CGPoint(x: 860, y: y), .next)
+}
+expectBox("Next の左端", CGPoint(x: 583, y: 500), .next)
+expectBox("Next の右端", CGPoint(x: 1137, y: 500), .next)
+expectBox("Inbox の右端", CGPoint(x: 569, y: 500), .inbox)
+expectBox("Done の左端", CGPoint(x: 1151, y: 500), .done)
+expectBox("列より上（受け付けない）", CGPoint(x: 860, y: -100), nil)
+expectBox("右にはみ出す → 近いDone", CGPoint(x: 2000, y: 500), .done)
+print(f8 == 0 ? "\n箱の中はどこでも: 全て通過" : "\n箱の中はどこでも: 失敗 \(f8) 件")
+
+exit((failures + f2 + f3 + f4 + f5 + f6 + f7 + f8) == 0 ? 0 : 1)

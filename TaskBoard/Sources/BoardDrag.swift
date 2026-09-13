@@ -47,22 +47,23 @@ struct BoardDrag {
         return .insert(status, parentCount[status] ?? rows.count)
     }
 
-    /// 列の当たり判定。見えている箱の全面で受け、外れても最も近い列へ寄せる。
-    /// 辞書の列挙順は不定なので、必ず x 座標で並べてから判定する。
+    /// 列の当たり判定。
+    /// 列は横に並んで縦は画面いっぱいなので、**横位置だけ**で決める。
+    /// 縦を条件に入れると、計測値がずれたときに「箱の中なのに入らない」が起きる。
     private func column(at point: CGPoint) -> Status? {
         let boxes = columns.sorted { $0.value.minX < $1.value.minX }
         guard !boxes.isEmpty else { return nil }
 
-        // 1. 箱の中（少し外側まで許容する）
-        // 列の間隔は12ptなので、片側6ptずつ広げると隙間をちょうど埋めて重ならない。
-        // 8ptにすると隣同士が4pt重なり、重なった帯では常に左の列が選ばれてしまう。
-        if let hit = boxes.first(where: { $0.value.insetBy(dx: -6, dy: -6).contains(point) }) {
-            return hit.key
-        }
-        // 2. 縦方向が盤に重なっていれば、横位置がいちばん近い列へ
+        // 列より上（ヘッダーより更に上）へ持っていったときだけ受け付けない
         let top = boxes.map(\.value.minY).min() ?? 0
-        let bottom = boxes.map(\.value.maxY).max() ?? 0
-        guard point.y >= top - 80, point.y <= bottom + 80 else { return nil }
+        guard point.y >= top - 80 else { return nil }
+
+        // 箱の横幅に入っていればその列。間隔は12ptなので片側6ptずつ埋める
+        if let hit = boxes.first(where: {
+            point.x >= $0.value.minX - 6 && point.x <= $0.value.maxX + 6
+        }) { return hit.key }
+
+        // 左右にはみ出したら、横位置がいちばん近い列へ
         return boxes.min { abs($0.value.midX - point.x) < abs($1.value.midX - point.x) }?.key
     }
 }
