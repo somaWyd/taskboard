@@ -437,6 +437,9 @@ struct KanbanView: View {
             Color.clear.contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        // 列いっぱいの当たり判定なので、キーボードの選択枠が出ると列全体が青く囲まれる
+        .focusable(false)
+        .focusEffectDisabled()
     }
 
     /// 余白クリック：選択中ならまず選択を外す。何も選んでいなければ追加に入る。
@@ -476,6 +479,8 @@ struct KanbanView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .focusable(false)
+        .focusEffectDisabled()
         .onHover { over in
             guard dragging == nil else { return }
             withAnimation(Motion.quick) { hoverEmpty = over ? status : nil }
@@ -567,22 +572,6 @@ struct KanbanView: View {
             .help(draftTask.allDay ? "時刻を決める" : "時間を指定しない（その日中）")
 
             Menu {
-                ForEach(store.doc.profiles) { p in
-                    Button { draftTask.profileID = p.id } label: {
-                        Label(p.name, systemImage: p.symbol)
-                    }
-                }
-            } label: {
-                Image(systemName: store.profile(draftTask.profileID).symbol)
-                    .font(.caption)
-            }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .fixedSize()
-            .tint(Color(hex: store.profile(draftTask.profileID).colorHex))
-            .help(store.profile(draftTask.profileID).name)
-
-            Menu {
                 ForEach(Repeat.allCases) { r in
                     if r == .customWeekly {
                         Menu(r.label) {
@@ -626,8 +615,6 @@ struct KanbanView: View {
             .tint(draftTask.repeatRule == .none ? Color.secondary : Color.accentColor)
             .help("繰り返し")
 
-            Spacer(minLength: 0)
-
             Button {
                 withAnimation(Motion.fade) { showDraftMemo.toggle() }
                 if showDraftMemo {
@@ -640,6 +627,24 @@ struct KanbanView: View {
             .buttonStyle(.plain)
             .foregroundStyle(showDraftMemo ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
             .help("メモ")
+
+            Menu {
+                ForEach(store.doc.profiles) { p in
+                    Button { draftTask.profileID = p.id } label: {
+                        Label(p.name, systemImage: p.symbol)
+                    }
+                }
+            } label: {
+                Image(systemName: store.profile(draftTask.profileID).symbol)
+                    .font(.caption)
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .tint(Color(hex: store.profile(draftTask.profileID).colorHex))
+            .help(store.profile(draftTask.profileID).name)
+
+            Spacer(minLength: 0)
 
             Button { commitDraft(draftTask.status) } label: {
                 Image(systemName: "checkmark.circle.fill").font(.system(size: 15))
