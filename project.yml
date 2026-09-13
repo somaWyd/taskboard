@@ -1,0 +1,41 @@
+name: TaskBoard
+options:
+  bundleIdPrefix: dev.soma
+  deploymentTarget:
+    macOS: "26.0"
+  developmentLanguage: ja
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: NO
+
+targets:
+  TaskBoard:
+    type: application
+    platform: macOS
+    sources:
+      - path: TaskBoard/Sources
+      - path: TaskBoard/Resources
+    info:
+      path: TaskBoard/Info.plist
+      properties:
+        CFBundleName: TaskBoard
+        CFBundleDisplayName: TaskBoard
+        CFBundleIconFile: AppIcon
+        CFBundlePackageType: APPL
+        LSApplicationCategoryType: public.app-category.productivity
+        LSMinimumSystemVersion: "26.0"
+        NSHumanReadableCopyright: ""
+        NSPrincipalClass: NSApplication
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.soma.taskboard
+        ENABLE_APP_SANDBOX: NO
+        ENABLE_USER_SELECTED_FILES: readwrite
+        COMBINE_HIDPI_IMAGES: YES
