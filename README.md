@@ -14,7 +14,7 @@ macOS 26 以降で動く、SwiftUI 製のタスク管理アプリ。カンバン
 - **繰り返し** — 毎日 / 平日 / 毎週 / 毎月 / 毎年 / 曜日指定
 - **期限** — 日時指定のほか「その日中（時刻なし）」に対応
 - **Markdown 出力** — 期間を指定してクリップボードへ
-- **キーボード操作** — ⌘N 追加 / ⌘Z 取り消し / ⌘B サイドバー開閉 / ⌘1〜5 期間切替 など
+- **キーボード操作** — ⌘N 追加 / ⌘Z 取り消し / ⌘B サイドバー開閉 / ⌘1〜5 期間切替 / ⌘+ ⌘- ⌘0 表示倍率 など
 - **外観** — ライト / ダーク、マット / リキッドグラス（`glassEffect`）を切替
 
 ## データの置き場所
@@ -49,6 +49,8 @@ open .build/Build/Products/Release/TaskBoard.app
 | ⌘⌫ | 選択したタスクを削除 |
 | ⌘B | サイドバーの開閉 |
 | ⌘1〜⌘5 | 期間の切替（サイドバーの並び順どおり） |
+| ⌘+ / ⌘- | 文字を大きく / 小さく（11〜22pt） |
+| ⌘0 | 標準サイズ（13pt）に戻す |
 | ⌘R | ファイルを再読み込み |
 | ⇧⌘C | Markdown をコピー |
 | ⌘, | 設定 |
@@ -83,7 +85,7 @@ xattr -dr com.apple.quarantine /Applications/TaskBoard.app
 ```bash
 swiftc -O TaskBoard/Sources/Models.swift TaskBoard/Sources/Filters.swift \
        TaskBoard/Sources/ColumnLayout.swift TaskBoard/Sources/BoardDrag.swift \
-       Tests/ColumnRectsMirror.swift Tests/main.swift -o /tmp/droptest && /tmp/droptest
+       Tests/ColumnRectsMirror.swift Tests/ZoomMirror.swift Tests/main.swift -o /tmp/droptest && /tmp/droptest
 ```
 
 ## 構成

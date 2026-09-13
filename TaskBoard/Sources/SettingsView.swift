@@ -41,7 +41,7 @@ struct GeneralSettings: View {
             }
             LabeledContent("文字サイズ") {
                 HStack {
-                    Slider(value: $settings.fontSize, in: 11...18, step: 1)
+                    Slider(value: $settings.fontSize, in: AppSettings.fontSizeRange, step: 1)
                     Text("\(Int(settings.fontSize))pt").monospacedDigit()
                 }
             }

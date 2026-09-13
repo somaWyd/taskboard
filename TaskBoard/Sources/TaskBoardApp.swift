@@ -107,6 +107,15 @@ struct AppCommands: Commands {
                                       modifiers: .command)
             }
             Divider()
+            Button("大きくする") { settings.zoom(by: 1) }
+                .keyboardShortcut("+", modifiers: .command)
+                .disabled(settings.fontSize >= AppSettings.fontSizeRange.upperBound)
+            Button("小さくする") { settings.zoom(by: -1) }
+                .keyboardShortcut("-", modifiers: .command)
+                .disabled(settings.fontSize <= AppSettings.fontSizeRange.lowerBound)
+            Button("標準サイズに戻す") { settings.resetZoom() }
+                .keyboardShortcut("0", modifiers: .command)
+            Divider()
             Button("再読み込み") { store.load() }
                 .keyboardShortcut("r", modifiers: .command)
         }

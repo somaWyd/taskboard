@@ -88,6 +88,15 @@ final class AppSettings {
     var accentHex: String { didSet { put(accentHex, "accentHex") } }
     var fontName: String { didSet { put(fontName, "fontName") } }      // "" = システム
     var fontSize: Double { didSet { put(fontSize, "fontSize") } }
+    static let fontSizeRange: ClosedRange<Double> = 11...22
+    static let defaultFontSize: Double = 13
+
+    /// 表示倍率の変更（⌘+ / ⌘- / ⌘0）
+    func zoom(by delta: Double) {
+        fontSize = min(max(fontSize + delta, Self.fontSizeRange.lowerBound),
+                       Self.fontSizeRange.upperBound)
+    }
+    func resetZoom() { fontSize = Self.defaultFontSize }
     var weekStartsMonday: Bool { didSet { put(weekStartsMonday, "weekStartsMonday") } }
     var showDoneColumn: Bool { didSet { put(showDoneColumn, "showDoneColumn") } }
     var doneRetentionDays: Int { didSet { put(doneRetentionDays, "doneRetentionDays") } }

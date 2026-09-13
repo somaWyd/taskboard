@@ -290,4 +290,22 @@ checkTime("9時 → 不正なので時刻なし", prof("9時").defaultHourMinute
 checkTime("0:00 → 0時0分", prof("0:00").defaultHourMinute.map { $0 == (0, 0) } ?? false)
 print(f9 == 0 ? "\n既定の時刻: 全て通過" : "\n既定の時刻: 失敗 \(f9) 件")
 
-exit((failures + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9) == 0 ? 0 : 1)
+
+// --- 表示倍率（⌘+ / ⌘- / ⌘0） ---
+print("\n--- 表示倍率 ---")
+var f10 = 0
+func checkZoom(_ label: String, _ got: Double, _ want: Double) {
+    let ok = abs(got - want) < 0.001
+    if !ok { f10 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label): \(got)")
+}
+checkZoom("13から拡大 → 14", ZoomMirror.zoom(13, by: 1), 14)
+checkZoom("13から縮小 → 12", ZoomMirror.zoom(13, by: -1), 12)
+checkZoom("上限22からさらに拡大 → 22のまま", ZoomMirror.zoom(22, by: 1), 22)
+checkZoom("下限11からさらに縮小 → 11のまま", ZoomMirror.zoom(11, by: -1), 11)
+checkZoom("上限を超える指定でも22で止まる", ZoomMirror.zoom(21, by: 5), 22)
+checkZoom("下限を下回る指定でも11で止まる", ZoomMirror.zoom(12, by: -5), 11)
+checkZoom("標準に戻す", ZoomMirror.standard, 13)
+print(f10 == 0 ? "\n表示倍率: 全て通過" : "\n表示倍率: 失敗 \(f10) 件")
+
+exit((failures + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9 + f10) == 0 ? 0 : 1)
