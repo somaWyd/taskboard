@@ -73,4 +73,34 @@ expectCol("Inbox と Next の隙間（Inbox寄り）", CGPoint(x: 205, y: 300), 
 expectCol("Done の中央", CGPoint(x: 540, y: 300), .done)
 expectCol("盤の遥か下", CGPoint(x: 320, y: 900), nil)
 print(f2 == 0 ? "\n列の判定: 全て通過" : "\n列の判定: 失敗 \(f2) 件")
-exit((failures + f2) == 0 ? 0 : 1)
+
+// --- サイドバーのプロファイル表示切替 ---
+print("\n--- プロファイルの表示切替 ---")
+let all4 = ["a", "b", "c", "d"]
+var f3 = 0
+func expectSet(_ label: String, _ got: Set<String>, _ want: Set<String>) {
+    let ok = got == want
+    if !ok { f3 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label): \(got.sorted())")
+}
+expectSet("全部表示中にaを押す → aだけ",
+          ProfileVisibility.toggle(active: [], clicked: "a", all: all4), ["a"])
+expectSet("aだけ表示中にaを押す → a以外ぜんぶ",
+          ProfileVisibility.toggle(active: ["a"], clicked: "a", all: all4), ["b", "c", "d"])
+expectSet("a,bを表示中にbを押す → aだけ",
+          ProfileVisibility.toggle(active: ["a", "b"], clicked: "b", all: all4), ["a"])
+expectSet("a,bを表示中にcを押す → a,b,c",
+          ProfileVisibility.toggle(active: ["a", "b"], clicked: "c", all: all4), ["a", "b", "c"])
+expectSet("a,b,cを表示中にdを押す → 全部表示（空集合）",
+          ProfileVisibility.toggle(active: ["a", "b", "c"], clicked: "d", all: all4), [])
+expectSet("b,c,dを表示中にaを押す → 全部表示（空集合）",
+          ProfileVisibility.toggle(active: ["b", "c", "d"], clicked: "a", all: all4), [])
+expectSet("プロファイルが1つだけなら全部表示のまま",
+          ProfileVisibility.toggle(active: [], clicked: "a", all: ["a"]), [])
+expectSet("1つだけのプロファイルを隠そうとしても維持",
+          ProfileVisibility.toggle(active: ["a"], clicked: "a", all: ["a"]), ["a"])
+expectSet("知らないIDは無視",
+          ProfileVisibility.toggle(active: ["a"], clicked: "z", all: all4), ["a"])
+print(f3 == 0 ? "\nプロファイル切替: 全て通過" : "\nプロファイル切替: 失敗 \(f3) 件")
+
+exit((failures + f2 + f3) == 0 ? 0 : 1)

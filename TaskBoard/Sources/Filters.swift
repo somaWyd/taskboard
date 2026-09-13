@@ -134,3 +134,29 @@ extension Array {
         indices.contains(index) ? self[index] : nil
     }
 }
+
+/// サイドバーのプロファイル表示切替。空集合は「全部表示」を表す。
+enum ProfileVisibility {
+    /// - Parameters:
+    ///   - active: いま表示しているプロファイル（空 = 全部）
+    ///   - clicked: 押されたプロファイル
+    ///   - all: 並び順どおりの全プロファイル
+    static func toggle(active: Set<String>, clicked: String, all: [String]) -> Set<String> {
+        guard all.contains(clicked) else { return active }
+        let everything = Set(all)
+
+        // 全部表示 → 押したものだけにする
+        if active.isEmpty { return all.count == 1 ? [] : [clicked] }
+
+        // 押したものだけ表示中 → それを隠して、残り全部を表示する
+        if active == [clicked] {
+            let rest = everything.subtracting([clicked])
+            return rest.isEmpty ? active : rest
+        }
+
+        var next = active
+        if next.contains(clicked) { next.remove(clicked) } else { next.insert(clicked) }
+        if next.isEmpty { return active }               // 全部消えるのは避ける
+        return next == everything ? [] : next           // 全部そろったら「全部表示」に畳む
+    }
+}

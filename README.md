@@ -64,8 +64,8 @@ xattr -dr com.apple.quarantine /Applications/TaskBoard.app
 ドラッグ&ドロップの当たり判定は GUI なしで検証できる。詳細は [Tests/README.md](Tests/README.md)。
 
 ```bash
-swiftc -O TaskBoard/Sources/Models.swift TaskBoard/Sources/BoardDrag.swift \
-       Tests/main.swift -o /tmp/droptest && /tmp/droptest
+swiftc -O TaskBoard/Sources/Models.swift TaskBoard/Sources/Filters.swift \
+       TaskBoard/Sources/BoardDrag.swift Tests/main.swift -o /tmp/droptest && /tmp/droptest
 ```
 
 ## 構成

@@ -204,21 +204,11 @@ struct SidebarView: View {
         store.save()
     }
 
-    /// プロファイルは「全部オン」を空集合で表す。最後の1つは消さない。
-    /// 全部オンの状態から押したときだけ、そのプロファイルだけの表示に切り替える。
     private func toggle(_ id: String) {
-        guard !state.activeProfiles.isEmpty else {
-            state.activeProfiles = [id]
-            return
-        }
-        var active = state.activeProfiles
-        if active.contains(id) {
-            guard active.count > 1 else { return }
-            active.remove(id)
-        } else {
-            active.insert(id)
-        }
-        state.activeProfiles = active.count == store.doc.profiles.count ? [] : active
+        state.activeProfiles = ProfileVisibility.toggle(
+            active: state.activeProfiles,
+            clicked: id,
+            all: store.doc.profiles.map(\.id))
     }
 
     private func count(_ period: Period) -> Int {
