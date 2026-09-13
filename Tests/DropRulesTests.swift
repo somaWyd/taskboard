@@ -43,5 +43,34 @@ expect("列の隙間(x=210) → 近いほうの列へ寄せる",
 expect("盤外（遠く下） → なし",
        s.drop(at: CGPoint(x: 100, y: 900)), nil)
 
-print(failures == 0 ? "\n全て通過" : "\n失敗 \(failures) 件")
-exit(failures == 0 ? 0 : 1)
+print(failures == 0 ? "\nドロップ種別: 全て通過" : "\nドロップ種別: 失敗 \(failures) 件")
+
+// --- 列の当たり判定を、箱の全面で受けられているか ---
+let wide = BoardDrag(task: task("drag"), grabOffset: .zero, cardWidth: 180,
+                     columns: [.inbox: inbox, .next: next, .done: CGRect(x: 440, y: 0, width: 200, height: 600)],
+                     order: [.inbox: rows, .next: [], .done: []])
+
+func col(_ d: BoardDrag.Drop?) -> Status? {
+    if case .insert(let s, _) = d { return s }
+    return nil
+}
+var f2 = 0
+func expectCol(_ label: String, _ p: CGPoint, _ want: Status?) {
+    let got = col(wide.drop(at: p))
+    let ok = got == want
+    if !ok { f2 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label): \(String(describing: got))")
+}
+print("\n--- 列の当たり判定 ---")
+expectCol("Next の左端", CGPoint(x: 221, y: 300), .next)
+expectCol("Next の中央", CGPoint(x: 320, y: 300), .next)
+expectCol("Next の右端", CGPoint(x: 419, y: 300), .next)
+expectCol("Next の最上部", CGPoint(x: 320, y: 2), .next)
+expectCol("Next の最下部", CGPoint(x: 320, y: 598), .next)
+expectCol("Next の少し上（箱の外）", CGPoint(x: 320, y: -30), .next)
+expectCol("Inbox と Next の隙間（Next寄り）", CGPoint(x: 215, y: 300), .next)
+expectCol("Inbox と Next の隙間（Inbox寄り）", CGPoint(x: 205, y: 300), .inbox)
+expectCol("Done の中央", CGPoint(x: 540, y: 300), .done)
+expectCol("盤の遥か下", CGPoint(x: 320, y: 900), nil)
+print(f2 == 0 ? "\n列の判定: 全て通過" : "\n列の判定: 失敗 \(f2) 件")
+exit((failures + f2) == 0 ? 0 : 1)

@@ -33,10 +33,20 @@ struct BoardDrag {
         return .insert(status, index)
     }
 
-    /// 列の外で離しても、横方向に最も近い列へ寄せる。
+    /// 列の当たり判定。見えている箱の全面で受け、外れても最も近い列へ寄せる。
+    /// 辞書の列挙順は不定なので、必ず x 座標で並べてから判定する。
     private func column(at point: CGPoint) -> Status? {
-        if let hit = columns.first(where: { $0.value.contains(point) })?.key { return hit }
-        let near = columns.filter { point.y >= $0.value.minY - 60 && point.y <= $0.value.maxY + 60 }
-        return near.min { abs($0.value.midX - point.x) < abs($1.value.midX - point.x) }?.key
+        let boxes = columns.sorted { $0.value.minX < $1.value.minX }
+        guard !boxes.isEmpty else { return nil }
+
+        // 1. 箱の中（少し外側まで許容する）
+        if let hit = boxes.first(where: { $0.value.insetBy(dx: -8, dy: -8).contains(point) }) {
+            return hit.key
+        }
+        // 2. 縦方向が盤に重なっていれば、横位置がいちばん近い列へ
+        let top = boxes.map(\.value.minY).min() ?? 0
+        let bottom = boxes.map(\.value.maxY).max() ?? 0
+        guard point.y >= top - 80, point.y <= bottom + 80 else { return nil }
+        return boxes.min { abs($0.value.midX - point.x) < abs($1.value.midX - point.x) }?.key
     }
 }
