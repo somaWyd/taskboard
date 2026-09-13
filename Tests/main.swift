@@ -44,8 +44,9 @@ expect("空の列 Next → 先頭に挿入",
        s.drop(at: CGPoint(x: 300, y: 300)), .insert(.next, 0))
 expect("列の隙間(x=210) → 近いほうの列へ寄せる",
        s.drop(at: CGPoint(x: 210, y: 300)), .insert(.inbox, 2))
-expect("盤外（遠く下） → なし",
-       s.drop(at: CGPoint(x: 100, y: 900)), nil)
+// 列は画面の下まで伸びているので、下方向は制限しない（横位置で列が決まる）
+expect("列の下の方 → その列の末尾",
+       s.drop(at: CGPoint(x: 100, y: 900)), .insert(.inbox, 2))
 
 print(failures == 0 ? "\nドロップ種別: 全て通過" : "\nドロップ種別: 失敗 \(failures) 件")
 
@@ -77,7 +78,7 @@ expectCol("Next の少し上（箱の外）", CGPoint(x: 320, y: -30), .next)
 expectCol("Inbox と Next の隙間（Next寄り）", CGPoint(x: 215, y: 300), .next)
 expectCol("Inbox と Next の隙間（Inbox寄り）", CGPoint(x: 205, y: 300), .inbox)
 expectCol("Done の中央", CGPoint(x: 540, y: 300), .done)
-expectCol("盤の遥か下", CGPoint(x: 320, y: 900), nil)
+expectCol("列の下の方はその列のまま", CGPoint(x: 320, y: 900), .next)
 print(f2 == 0 ? "\n列の判定: 全て通過" : "\n列の判定: 失敗 \(f2) 件")
 
 // --- プロファイルの絞り込み（nil=全部 / 集合=そのぶんだけ / 空=0件） ---
