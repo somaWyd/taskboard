@@ -6,14 +6,18 @@ func task(_ t: String) -> Task { Task(title: t, profileID: "p", due: Date()) }
 let inbox = CGRect(x: 0, y: 0, width: 200, height: 600)
 let next  = CGRect(x: 220, y: 0, width: 200, height: 600)
 let a = UUID(), b = UUID(), c = UUID()
-let rows: [(id: UUID, frame: CGRect, canBeParent: Bool)] = [
-    (a, CGRect(x: 10, y: 10, width: 180, height: 60), true),
-    (b, CGRect(x: 10, y: 80, width: 180, height: 60), true),
-    (c, CGRect(x: 10, y: 150, width: 180, height: 60), false),   // サブタスク＝親にできない
+let rows: [BoardDrag.Row] = [
+    .init(id: a, frame: CGRect(x: 10, y: 10, width: 180, height: 60),
+          canBeParent: true, insertBefore: 0),
+    .init(id: b, frame: CGRect(x: 10, y: 80, width: 180, height: 60),
+          canBeParent: true, insertBefore: 1),
+    .init(id: c, frame: CGRect(x: 10, y: 150, width: 180, height: 60),
+          canBeParent: false, insertBefore: 2),   // b のサブタスク
 ]
 let s = BoardDrag(task: task("drag"), grabOffset: .zero, cardWidth: 180,
                   columns: [.inbox: inbox, .next: next],
-                  order: [.inbox: rows, .next: []])
+                  order: [.inbox: rows, .next: []],
+                  parentCount: [.inbox: 2, .next: 0])
 
 var failures = 0
 func expect(_ label: String, _ got: BoardDrag.Drop?, _ want: BoardDrag.Drop?) {
@@ -33,13 +37,13 @@ expect("カードBの上半分 → Bの手前に挿入",
 expect("カードBの下半分 → Bのサブタスク",
        s.drop(at: CGPoint(x: 100, y: 125)), .subtask(b))
 expect("サブタスクCの下半分 → 親にできないので挿入",
-       s.drop(at: CGPoint(x: 100, y: 195)), .insert(.inbox, 3))
+       s.drop(at: CGPoint(x: 100, y: 195)), .insert(.inbox, 2))
 expect("いちばん下の余白 → 末尾に挿入",
-       s.drop(at: CGPoint(x: 100, y: 400)), .insert(.inbox, 3))
+       s.drop(at: CGPoint(x: 100, y: 400)), .insert(.inbox, 2))
 expect("空の列 Next → 先頭に挿入",
        s.drop(at: CGPoint(x: 300, y: 300)), .insert(.next, 0))
 expect("列の隙間(x=210) → 近いほうの列へ寄せる",
-       s.drop(at: CGPoint(x: 210, y: 300)), .insert(.inbox, 3))
+       s.drop(at: CGPoint(x: 210, y: 300)), .insert(.inbox, 2))
 expect("盤外（遠く下） → なし",
        s.drop(at: CGPoint(x: 100, y: 900)), nil)
 
@@ -47,8 +51,10 @@ print(failures == 0 ? "\nドロップ種別: 全て通過" : "\nドロップ種�
 
 // --- 列の当たり判定を、箱の全面で受けられているか ---
 let wide = BoardDrag(task: task("drag"), grabOffset: .zero, cardWidth: 180,
-                     columns: [.inbox: inbox, .next: next, .done: CGRect(x: 440, y: 0, width: 200, height: 600)],
-                     order: [.inbox: rows, .next: [], .done: []])
+                     columns: [.inbox: inbox, .next: next,
+                               .done: CGRect(x: 440, y: 0, width: 200, height: 600)],
+                     order: [.inbox: rows, .next: [], .done: []],
+                     parentCount: [.inbox: 2, .next: 0, .done: 0])
 
 func col(_ d: BoardDrag.Drop?) -> Status? {
     if case .insert(let s, _) = d { return s }
@@ -103,4 +109,32 @@ expectSet("知らないIDは無視",
           ProfileVisibility.toggle(active: ["a"], clicked: "z", all: all4), ["a"])
 print(f3 == 0 ? "\nプロファイル切替: 全て通過" : "\nプロファイル切替: 失敗 \(f3) 件")
 
-exit((failures + f2 + f3) == 0 ? 0 : 1)
+
+// --- サブタスクの行が判定に含まれているか（今回の不具合の再発防止） ---
+print("\n--- 親と子が混ざった列 ---")
+let pA = UUID(), sA = UUID(), pB = UUID()
+let mixed: [BoardDrag.Row] = [
+    .init(id: pA, frame: CGRect(x: 10, y: 10,  width: 180, height: 60),
+          canBeParent: true,  insertBefore: 0),   // 親A（親リストの0番）
+    .init(id: sA, frame: CGRect(x: 40, y: 80,  width: 150, height: 50),
+          canBeParent: false, insertBefore: 1),   // Aの子 → 落とすとAの次
+    .init(id: pB, frame: CGRect(x: 10, y: 140, width: 180, height: 60),
+          canBeParent: true,  insertBefore: 1),   // 親B（親リストの1番）
+]
+let m = BoardDrag(task: task("drag"), grabOffset: .zero, cardWidth: 180,
+                  columns: [.inbox: inbox], order: [.inbox: mixed],
+                  parentCount: [.inbox: 2])
+var f4 = 0
+func expectMix(_ label: String, _ got: BoardDrag.Drop?, _ want: BoardDrag.Drop?) {
+    let ok = got == want
+    if !ok { f4 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label): \(String(describing: got))")
+}
+expectMix("親Aの下半分 → Aのサブタスク", m.drop(at: CGPoint(x: 100, y: 55)), .subtask(pA))
+expectMix("子の上半分 → 親Aの次(1)", m.drop(at: CGPoint(x: 100, y: 90)), .insert(.inbox, 1))
+expectMix("子の下半分 → 親Aの次(1)", m.drop(at: CGPoint(x: 100, y: 120)), .insert(.inbox, 1))
+expectMix("親Bの上半分 → Bの手前(1)", m.drop(at: CGPoint(x: 100, y: 155)), .insert(.inbox, 1))
+expectMix("親Bの下半分 → Bのサブタスク", m.drop(at: CGPoint(x: 100, y: 185)), .subtask(pB))
+print(f4 == 0 ? "\n親子混在: 全て通過" : "\n親子混在: 失敗 \(f4) 件")
+
+exit((failures + f2 + f3 + f4) == 0 ? 0 : 1)

@@ -261,14 +261,16 @@ struct KanbanView: View {
     private func drag(_ task: Task) -> some Gesture {
         DragGesture(minimumDistance: 5, coordinateSpace: .named("board"))
             .onChanged { value in
-                if session == nil { begin(task, at: value.startLocation) }
+                // begin の直後は @State の反映を待たず、作った値をそのまま使う
+                let current = session ?? begin(task, at: value.startLocation)
                 dragModel.point = value.location
-                let next = session?.drop(at: value.location)
+                let next = current.drop(at: value.location)
                 if next != drop { drop = next }
                 hover = hoverColumn(for: next)
             }
             .onEnded { value in
                 defer { endDrag() }
+                DragLog.end(session, at: value.location)
                 guard let session, let result = session.drop(at: value.location) else { return }
                 let moving = draggedGroup(task)
                 withAnimation(Motion.settle) { apply(result, moving: moving) }
@@ -283,28 +285,52 @@ struct KanbanView: View {
     }
 
     /// 開始時に盤面を写し取る。以後はこのスナップショットだけで判定する。
-    private func begin(_ task: Task, at start: CGPoint) {
+    @discardableResult
+    private func begin(_ task: Task, at start: CGPoint) -> BoardDrag {
         let own = Set(store.subtasks(of: task).map(\.id) + [task.id])
-        var order: [Status: [(id: UUID, frame: CGRect, canBeParent: Bool)]] = [:]
         let grouped = groupedTasks()          // 開始時に1回だけ
+        var order: [Status: [BoardDrag.Row]] = [:]
+        var parentCount: [Status: Int] = [:]
+
         for status in visibleColumns {
-            order[status] = (grouped[status] ?? []).compactMap { t in
-                guard let f = cardFrames[t.id], !own.contains(t.id) else { return nil }
-                return (t.id, f, !t.isSubtask)
+            let parents = grouped[status] ?? []
+            parentCount[status] = parents.count
+            var rows: [BoardDrag.Row] = []
+            for (index, parent) in parents.enumerated() {
+                // 画面に出ている順（親 → その子）で積む。
+                // 子を入れ忘れると、その高さぶんが判定の空白になる。
+                if !own.contains(parent.id), let f = cardFrames[parent.id] {
+                    rows.append(.init(id: parent.id, frame: f,
+                                      canBeParent: true, insertBefore: index))
+                }
+                for child in store.subtasks(of: parent) {
+                    if !own.contains(child.id), let f = cardFrames[child.id] {
+                        // 子の位置に落としたら、その親の「次」に入る
+                        rows.append(.init(id: child.id, frame: f,
+                                          canBeParent: false, insertBefore: index + 1))
+                    }
+                }
             }
+            order[status] = rows.sorted { $0.frame.minY < $1.frame.minY }
         }
+
         let frame = cardFrames[task.id]
         let center = CGPoint(x: frame?.midX ?? start.x, y: frame?.midY ?? start.y)
-        let width = max((frames[task.status]?.width ?? 280) - 20, 160)
+        let fallbackWidth = max((frames[task.status]?.width ?? 280) - 20, 160)
+        let visible = frames.filter { visibleColumns.contains($0.key) }
 
-        session = BoardDrag(task: task,
-                              grabOffset: CGSize(width: center.x - start.x,
-                                                 height: center.y - start.y),
-                              cardWidth: frame?.width ?? width,
-                              columns: frames,
-                              order: order)
-        grabOffset = session?.grabOffset ?? .zero
+        let made = BoardDrag(task: task,
+                             grabOffset: CGSize(width: center.x - start.x,
+                                                height: center.y - start.y),
+                             cardWidth: frame?.width ?? fallbackWidth,
+                             columns: visible,
+                             order: order,
+                             parentCount: parentCount)
+        session = made
+        grabOffset = made.grabOffset
         withAnimation(Motion.lift) { dragging = task }
+        DragLog.begin(made, cardFramesCount: cardFrames.count, start: start)
+        return made
     }
 
     private func apply(_ result: BoardDrag.Drop, moving: [Task]) {
