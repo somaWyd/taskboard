@@ -456,17 +456,21 @@ struct KanbanView: View {
                     .focused($focus, equals: "column-\(status.rawValue)")
                     .onSubmit { commitDraft(status) }
             }
-            attributeRow
+            // メモはタイトルの直下。カードの表示と同じ並びにする
             if showDraftMemo {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "note.text").font(.caption).foregroundStyle(.tertiary)
-                    TextField("", text: $draftTask.memo, axis: .vertical)
-                        .textFieldStyle(.plain)
-                        .font(.caption)
-                        .lineLimit(1...3)
-                }
-                .padding(.leading, 21)
+                TextField("メモ", text: $draftTask.memo, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: settings.fontSize - 1))
+                    .lineLimit(1...4)
+                    .focused($focus, equals: "memo-\(status.rawValue)")
+                    .padding(.leading, 8)
+                    .overlay(alignment: .leading) {
+                        Capsule().fill(Color.primary.opacity(0.22)).frame(width: 2)
+                    }
+                    .padding(.leading, 23)
+                    .transition(.opacity)
             }
+            attributeRow
         }
         .padding(.horizontal, 13).padding(.vertical, 13)
         .panel(settings.surface, radius: 10, elevated: true)
@@ -587,7 +591,12 @@ struct KanbanView: View {
 
             Spacer(minLength: 0)
 
-            Button { showDraftMemo.toggle() } label: {
+            Button {
+                withAnimation(Motion.fade) { showDraftMemo.toggle() }
+                if showDraftMemo {
+                    DispatchQueue.main.async { focus = "memo-\(draftTask.status.rawValue)" }
+                }
+            } label: {
                 Image(systemName: showDraftMemo ? "note.text" : "note")
                     .font(.caption)
             }
