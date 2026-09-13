@@ -69,7 +69,7 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         // ファイル
-        CommandGroup(after: .newItem) {
+        CommandGroup(replacing: .newItem) {
             Button("新規タスク") { state.composeRequest += 1 }
                 .keyboardShortcut("n", modifiers: .command)
             Button("新規タスク（詳細）…") { state.showingNew = true }

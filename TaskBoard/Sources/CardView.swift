@@ -17,7 +17,10 @@ struct CardView: View {
     @State private var showCalendar = false
     @State private var showPriority = false
     @State private var memoDraft = ""
-    @FocusState private var field: Field?
+    /// いまどの入力欄を出しているか。焦点とは別に持つ。
+    /// 同じ変数で兼ねると、まだ画面に無い入力欄に焦点を当てようとして無効化される。
+    @State private var editing: Field?
+    @FocusState private var focused: Field?
 
     private enum Field: Hashable { case title, memo }
 
@@ -53,6 +56,15 @@ struct CardView: View {
                   width: selected ? 2 : (settings.cardTint == .edge ? 1 : 0.5))
         .shadow(color: .black.opacity(ghost ? 0.28 : 0.06), radius: ghost ? 14 : 1, y: ghost ? 8 : 1)
         .opacity(task.status == .done && !ghost ? 0.62 : 1)
+        .onChange(of: focused) { previous, now in
+            // 他所をクリックして焦点が外れたときも書いた内容を保存する
+            guard now == nil else { return }
+            switch previous {
+            case .title: commitTitle()
+            case .memo: commitMemo()
+            case .none: break
+            }
+        }
     }
 
     // MARK: - 重要度
@@ -122,13 +134,13 @@ struct CardView: View {
                 priorityDot
             }
 
-            if field == .title {
+            if editing == .title {
                 TextField("タイトル", text: $titleDraft)
                     .textFieldStyle(.plain)
                     .font(.system(size: isSubtask ? settings.fontSize : settings.fontSize + 1))
-                    .focused($field, equals: .title)
+                    .focused($focused, equals: .title)
                     .onSubmit { commitTitle() }
-                    .onExitCommand { field = nil }
+                    .onExitCommand { cancelEditing() }
             } else {
                 Text(task.title.isEmpty ? "（無題）" : task.title)
                     .font(.system(size: isSubtask ? settings.fontSize : settings.fontSize + 1))
@@ -147,14 +159,14 @@ struct CardView: View {
 
     @ViewBuilder
     private var memoRow: some View {
-        if field == .memo {
+        if editing == .memo {
             TextField("メモ", text: $memoDraft, axis: .vertical)
                 .textFieldStyle(.plain)
                 .font(.system(size: settings.fontSize - 1))
                 .lineLimit(1...4)
-                .focused($field, equals: .memo)
+                .focused($focused, equals: .memo)
                 .onSubmit { commitMemo() }
-                .onExitCommand { field = nil }
+                .onExitCommand { cancelEditing() }
                 .padding(.leading, 8)
                 .overlay(alignment: .leading) { Capsule().fill(.tint).frame(width: 2) }
         } else if !task.memo.isEmpty {
@@ -177,18 +189,12 @@ struct CardView: View {
             dueMenu
             repeatMenu
             memoButton
+            subtaskButton
             if !subtasks.isEmpty {
                 Text("\(subtasks.filter { $0.status == .done }.count)/\(subtasks.count)")
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
-            if let onAddSubtask {
-                Button(action: onAddSubtask) {
-                    Image(systemName: "text.append").font(.caption)
-                }
-                .buttonStyle(.plain).foregroundStyle(.tertiary)
-                .help("サブタスクを追加")
-            }
         }
     }
 
@@ -308,8 +314,22 @@ struct CardView: View {
     }
 
     @ViewBuilder
+    private var subtaskButton: some View {
+        if let onAddSubtask {
+            Button(action: onAddSubtask) {
+                Image(systemName: subtasks.isEmpty ? "text.append" : "text.badge.plus")
+                    .font(.caption)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(subtasks.isEmpty ? AnyShapeStyle(.tertiary)
+                                              : AnyShapeStyle(Color.secondary))
+            .help("サブタスクを追加")
+        }
+    }
+
+    @ViewBuilder
     private var memoButton: some View {
-        if !task.memo.isEmpty || field == .memo {
+        if !task.memo.isEmpty || editing == .memo {
             Button { beginMemo() } label: {
                 Image(systemName: "note.text").font(.caption)
             }
@@ -328,12 +348,14 @@ struct CardView: View {
     private func beginTitle() {
         guard editable else { return }
         titleDraft = task.title
-        field = .title
+        editing = .title
+        // 入力欄が画面に出てから焦点を当てる
+        DispatchQueue.main.async { focused = .title }
     }
 
     private func commitTitle() {
         let name = titleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        field = nil
+        cancelEditing()
         guard !name.isEmpty, name != task.title else { return }
         var t = task; t.title = name; store.upsert(t)
     }
@@ -341,11 +363,17 @@ struct CardView: View {
     private func beginMemo() {
         guard editable else { return }
         memoDraft = task.memo
-        field = .memo
+        editing = .memo
+        DispatchQueue.main.async { focused = .memo }
+    }
+
+    private func cancelEditing() {
+        editing = nil
+        focused = nil
     }
 
     private func commitMemo() {
-        field = nil
+        cancelEditing()
         guard memoDraft != task.memo else { return }
         var t = task; t.memo = memoDraft; store.upsert(t)
     }
