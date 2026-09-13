@@ -38,6 +38,27 @@ xcodebuild -project TaskBoard.xcodeproj -scheme TaskBoard -configuration Release
 open .build/Build/Products/Release/TaskBoard.app
 ```
 
+## インストール（dmg を作る）
+
+`/Applications` へドラッグできる dmg を作る。Release ビルド → アドホック署名の付け直し → dmg 作成までを1本で行う。
+
+```bash
+./scripts/make-dmg.sh
+open dist/
+```
+
+できた `dist/TaskBoard-<version>.dmg` を開き、`TaskBoard.app` を `Applications` フォルダへドラッグする。これで Launchpad と Spotlight から起動できるようになる。
+
+### 初回起動で「開発元を確認できません」と言われたら
+
+署名も公証もしていないため、Gatekeeper に止められることがある。**アプリを右クリック →「開く」**を選び、確認ダイアログで「開く」を押す（1度だけでよい）。
+
+ネットワーク経由で受け取った dmg の場合は隔離属性が付いているので、先に外す。
+
+```bash
+xattr -dr com.apple.quarantine /Applications/TaskBoard.app
+```
+
 ## テスト
 
 ドラッグ&ドロップの当たり判定は GUI なしで検証できる。詳細は [Tests/README.md](Tests/README.md)。
