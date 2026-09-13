@@ -208,6 +208,7 @@ struct KanbanView: View {
                     Capsule().fill(Color.primary.opacity(0.16))
                         .frame(width: 1.5)
                         .padding(.vertical, 2).padding(.leading, 11)
+                        .transition(.opacity)
                 }
             }
             .transition(.opacity)

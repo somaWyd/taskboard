@@ -39,6 +39,7 @@ struct CardView: View {
             VStack(alignment: .leading, spacing: 7) {
                 titleRow
                 memoRow
+                    .animation(Motion.fade, value: task.memo.isEmpty)
                 if !isSubtask || !task.memo.isEmpty || task.repeatRule != .none { metaRow }
             }
             .padding(.horizontal, 13)
@@ -168,17 +169,26 @@ struct CardView: View {
                 .onSubmit { commitMemo() }
                 .onExitCommand { cancelEditing() }
                 .padding(.leading, 8)
-                .overlay(alignment: .leading) { Capsule().fill(.tint).frame(width: 2) }
+                .overlay(alignment: .leading) { memoBar }
+                .transition(.opacity)
         } else if !task.memo.isEmpty {
             Text(task.memo)
                 .font(.system(size: settings.fontSize - 1))
                 .foregroundStyle(.secondary)
                 .lineLimit(2)
                 .padding(.leading, 8)
-                .overlay(alignment: .leading) { Capsule().fill(.quaternary).frame(width: 2) }
+                .overlay(alignment: .leading) { memoBar }
                 .contentShape(Rectangle())
                 .onTapGesture(count: 2) { beginMemo() }
+                .transition(.opacity)
         }
+    }
+
+    /// メモの左に出る縦棒。編集中も表示中も同じグレーにする。
+    private var memoBar: some View {
+        Capsule()
+            .fill(Color.primary.opacity(0.22))
+            .frame(width: 2)
     }
 
     // MARK: - メタ行
@@ -348,7 +358,7 @@ struct CardView: View {
     private func beginTitle() {
         guard editable else { return }
         titleDraft = task.title
-        editing = .title
+        withAnimation(Motion.fade) { editing = .title }
         // 入力欄が画面に出てから焦点を当てる
         DispatchQueue.main.async { focused = .title }
     }
@@ -363,12 +373,12 @@ struct CardView: View {
     private func beginMemo() {
         guard editable else { return }
         memoDraft = task.memo
-        editing = .memo
+        withAnimation(Motion.fade) { editing = .memo }
         DispatchQueue.main.async { focused = .memo }
     }
 
     private func cancelEditing() {
-        editing = nil
+        withAnimation(Motion.fade) { editing = nil }
         focused = nil
     }
 

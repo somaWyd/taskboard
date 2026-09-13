@@ -51,4 +51,6 @@ enum Motion {
     static let lift = Animation.spring(response: 0.26, dampingFraction: 0.72)
     static let settle = Animation.spring(response: 0.34, dampingFraction: 0.78)
     static let quick = Animation.easeOut(duration: 0.16)
+    /// 線や補助表示がふっと現れるとき
+    static let fade = Animation.easeInOut(duration: 0.22)
 }
