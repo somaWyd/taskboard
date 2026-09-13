@@ -59,6 +59,8 @@ struct KanbanView: View {
     @State private var draftTask = Task(title: "", profileID: "", due: Date())
     @State private var showDraftMemo = false
     @State private var hoverEmpty: Status?
+    /// 完了の演出中のタスク。消えるのを待たせて線を引く。
+    @State private var celebrating: Set<UUID> = []
     @State private var subtaskParent: UUID?
     @State private var subtaskDraft = ""
     @FocusState private var focus: String?
@@ -189,7 +191,11 @@ struct KanbanView: View {
         return CardView(task: task,
                         selected: selection.contains(task.id),
                         isSubtask: row.isSubtask,
-                        onToggle: row.isSubtask ? { withAnimation(Motion.settle) { store.toggleDone(task) } } : nil,
+                        onToggle: row.isSubtask ? {
+                            let becomesDone = task.status != .done
+                            withAnimation(Motion.settle) { store.toggleDone(task) }
+                            if becomesDone { celebrate([task.id]) }
+                        } : nil,
                         onAddSubtask: row.isSubtask ? nil : { beginSubtask(task) })
             .opacity(isDragging ? 0 : 1)
             .animation(nil, value: isDragging)
@@ -211,6 +217,7 @@ struct KanbanView: View {
                         .transition(.opacity)
                 }
             }
+            .overlay { completionSweep(task) }
             .transition(.opacity)
             .animation(Motion.quick, value: drop)
             .gesture(drag(task))
@@ -220,6 +227,29 @@ struct KanbanView: View {
 
     /// 子カードの左インデント。この差がそのまま親との幅の差になる。
     private var subtaskIndent: CGFloat { 30 }
+
+    /// 完了の線。カードの中央を左から右へ引かれる。
+    @ViewBuilder
+    private func completionSweep(_ task: Task) -> some View {
+        let on = celebrating.contains(task.id)
+        Rectangle()
+            .fill(Color.primary.opacity(0.55))
+            .frame(height: 1.5)
+            .scaleEffect(x: on ? 1 : 0, anchor: .leading)
+            .opacity(on ? 1 : 0)
+            .padding(.horizontal, 12)
+            .allowsHitTesting(false)
+            .animation(.easeOut(duration: 0.28), value: on)
+    }
+
+    /// 完了したタスクを少しのあいだ残し、線を引いてから消えるようにする。
+    private func celebrate(_ ids: [UUID]) {
+        guard !ids.isEmpty else { return }
+        celebrating.formUnion(ids)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+            withAnimation(Motion.settle) { celebrating.subtract(ids) }
+        }
+    }
 
     private var insertionLine: some View {
         Capsule().fill(.tint).frame(height: 2.5).padding(.horizontal, 2)
@@ -237,7 +267,11 @@ struct KanbanView: View {
         let targets = selection.contains(task.id) && selection.count > 1
             ? selection : [task.id]
         ForEach(Status.allCases.filter { $0 != task.status }) { s in
-            Button("\(s.label) へ移動") { store.bulkMove(Set(targets), to: s) ; selection = [] }
+            Button("\(s.label) へ移動") {
+                withAnimation(Motion.settle) { store.bulkMove(Set(targets), to: s) }
+                if s == .done { celebrate(Array(targets)) }
+                selection = []
+            }
         }
         Divider()
         Button("サブタスクを追加") { beginSubtask(task) }
@@ -341,12 +375,15 @@ struct KanbanView: View {
             guard let parent = store.doc.tasks.first(where: { $0.id == parentID }) else { return }
             for t in moving where t.id != parent.id { _ = store.makeSubtask(t, of: parent) }
         case .insert(let status, let index):
+            let newlyDone = status == .done
+                ? moving.filter { $0.status != .done }.map(\.id) : []
             for t in moving {
                 // 列の余白へ落とした子は、親から外れて通常タスクに戻る
                 if t.isSubtask { store.detach(t) }
                 if t.status != status { store.moveWithSubtasks(t, to: status) }
             }
             reorder(moving, in: status, to: index)
+            celebrate(newlyDone)
         }
     }
 
@@ -753,8 +790,11 @@ struct KanbanView: View {
     }
 
     /// Done列に残す範囲。0日なら完了した時点で隠す。
+    /// ただし完了の演出中のものは、線を引き終わるまで残す。
     private func trimmedDone(_ items: [Task]) -> [Task] {
-        guard settings.doneRetentionDays > 0 else { return [] }
+        guard settings.doneRetentionDays > 0 else {
+            return items.filter { celebrating.contains($0.id) }
+        }
         let limit = settings.calendar.date(byAdding: .day,
                                            value: -settings.doneRetentionDays, to: Date())
         return items.filter { ($0.completedAt ?? $0.due) >= (limit ?? .distantPast) }
