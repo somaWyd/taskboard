@@ -132,4 +132,61 @@ expectMix("親Bの上半分 → Bの手前(1)", m.drop(at: CGPoint(x: 100, y: 15
 expectMix("親Bの下半分 → Bのサブタスク", m.drop(at: CGPoint(x: 100, y: 185)), .subtask(pB))
 print(f4 == 0 ? "\n親子混在: 全て通過" : "\n親子混在: 失敗 \(f4) 件")
 
-exit((failures + f2 + f3 + f4) == 0 ? 0 : 1)
+
+// --- 描画の並びと判定表が一致しているか（今回の作り直しの要） ---
+print("\n--- ColumnLayout と判定表の一致 ---")
+var f5 = 0
+func check(_ label: String, _ ok: Bool) {
+    if !ok { f5 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label)")
+}
+
+let pa = Task(title: "親A", status: .inbox, profileID: "p", due: Date())
+let pb = Task(title: "親B", status: .inbox, profileID: "p", due: Date())
+var c1 = Task(title: "子1", status: .inbox, profileID: "p", due: Date()); c1.parentID = pa.id
+var c2 = Task(title: "子2", status: .inbox, profileID: "p", due: Date()); c2.parentID = pa.id
+let kids: [UUID: [Task]] = [pa.id: [c1, c2], pb.id: []]
+
+let layout = ColumnLayout(status: .inbox, parents: [pa, pb]) { kids[$0.id] ?? [] }
+
+check("行数 = 親2 + 子2 = 4", layout.rows.count == 4)
+check("並びは 親A → 子1 → 子2 → 親B",
+      layout.rows.map(\.task.title) == ["親A", "子1", "子2", "親B"])
+check("親Aの添字は0", layout.rows[0].insertBefore == 0)
+check("子の添字は親Aの次(1)",
+      layout.rows[1].insertBefore == 1 && layout.rows[2].insertBefore == 1)
+check("親Bの添字は1", layout.rows[3].insertBefore == 1)
+check("挿入線を出すのは親の行だけ",
+      layout.rows.map(\.showsInsertionLine) == [true, false, false, true])
+check("まとまりの終わりは 子2 と 親B",
+      layout.rows.map(\.isGroupEnd) == [false, false, true, true])
+check("末尾の添字は親の数と同じ", layout.endIndex == layout.parents.count)
+
+// 同じ layout から判定表を作り、添字が親リストの範囲に収まることを確かめる
+var y: CGFloat = 0
+let built: [BoardDrag.Row] = layout.rows.map { row in
+    let r = BoardDrag.Row(id: row.task.id,
+                          frame: CGRect(x: 0, y: y, width: 200, height: 60),
+                          canBeParent: !row.isSubtask,
+                          insertBefore: row.insertBefore)
+    y += 70
+    return r
+}
+let bd = BoardDrag(task: Task(title: "運ぶ", profileID: "p", due: Date()),
+                   grabOffset: .zero, cardWidth: 200,
+                   columns: [.inbox: CGRect(x: 0, y: 0, width: 220, height: 400)],
+                   order: [.inbox: built],
+                   parentCount: [.inbox: layout.parents.count])
+
+var allInRange = true
+for probe in stride(from: CGFloat(0), to: 400, by: 5) {
+    if case .insert(_, let i)? = bd.drop(at: CGPoint(x: 100, y: probe)) {
+        if i < 0 || i > layout.parents.count { allInRange = false }
+    }
+}
+check("盤面のどこに落としても添字が親リストの範囲に収まる", allInRange)
+check("子の行は親候補にならない", built.filter(\.canBeParent).count == 2)
+
+print(f5 == 0 ? "\n並びの一致: 全て通過" : "\n並びの一致: 失敗 \(f5) 件")
+
+exit((failures + f2 + f3 + f4 + f5) == 0 ? 0 : 1)

@@ -67,9 +67,9 @@ struct KanbanView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             HStack(alignment: .top, spacing: 12) {
-                let grouped = groupedTasks()
+                let layouts = columnLayouts()
                 ForEach(visibleColumns, id: \.self) { status in
-                    column(status, items: grouped[status] ?? [])
+                    if let layout = layouts[status] { column(layout) }
                 }
             }
             .padding(14)
@@ -96,28 +96,38 @@ struct KanbanView: View {
 
     // MARK: - 列
 
-    private func column(_ status: Status, items: [Task]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            header(status, count: items.count)
+    private func column(_ layout: ColumnLayout) -> some View {
+        let status = layout.status
+        return VStack(alignment: .leading, spacing: 0) {
+            header(status, count: layout.parents.count)
             GeometryReader { geo in
                 ScrollView {
                     LazyVStack(spacing: 10) {
-                        ForEach(Array(items.enumerated()), id: \.element.id) { index, task in
-                            if drop == .insert(status, index) { insertionLine }
-                            cardSlot(task)
+                        ForEach(layout.rows) { row in
+                            if row.showsInsertionLine,
+                               drop == .insert(status, row.insertBefore) { insertionLine }
+                            rowView(row)
+                            if subtaskParent == row.groupParentID, row.isGroupEnd,
+                               let parent = layout.parents.first(where: { $0.id == row.groupParentID }) {
+                                subtaskComposer(parent)
+                                    .padding(.leading, subtaskIndent)
+                                    .transition(.asymmetric(
+                                        insertion: .move(edge: .top).combined(with: .opacity),
+                                        removal: .opacity.combined(with: .scale(scale: 0.97))))
+                            }
                         }
-                        if drop == .insert(status, items.count) { insertionLine }
+                        if drop == .insert(status, layout.endIndex) { insertionLine }
                         if composing == status {
                             composer(status)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .top).combined(with: .opacity),
                                     removal: .opacity.combined(with: .scale(scale: 0.97))))
                         }
-                        addTarget(status, empty: items.isEmpty && composing != status)
+                        addTarget(status, empty: layout.isEmpty && composing != status)
                     }
                     .frame(minHeight: geo.size.height, alignment: .top)
                     .background { addBackground(status) }
-                    .animation(Motion.settle, value: items.count)
+                    .animation(Motion.settle, value: layout.rows.count)
                     .animation(Motion.settle, value: composing)
                 }
             }
@@ -154,26 +164,16 @@ struct KanbanView: View {
 
     // MARK: - カード
 
-    private func cardSlot(_ task: Task) -> some View {
+    /// 親も子も必ずここを通る。描かれた行は必ず座標を報告するので、
+    /// 判定表に載らない行が生まれない。
+    private func rowView(_ row: ColumnLayout.Row) -> some View {
+        let task = row.task
         let isDragging = dragging?.id == task.id
-        let subs = store.subtasks(of: task)
-        return VStack(alignment: .trailing, spacing: 8) {
-            card(task, dragging: isDragging)
-            if !subs.isEmpty || subtaskParent == task.id {
-                subtaskGroup(task, subs)
-            }
-        }
-        .transition(.opacity.combined(with: .scale(scale: 0.97)))
-        .animation(Motion.settle, value: isDragging)
-        .animation(Motion.settle, value: subs.count)
-    }
-
-    private func card(_ task: Task, dragging isDragging: Bool, isSub: Bool = false) -> some View {
-        CardView(task: task,
-                 selected: selection.contains(task.id),
-                 isSubtask: isSub,
-                 onToggle: isSub ? { store.toggleDone(task) } : nil,
-                 onAddSubtask: isSub ? nil : { beginSubtask(task) })
+        return CardView(task: task,
+                        selected: selection.contains(task.id),
+                        isSubtask: row.isSubtask,
+                        onToggle: row.isSubtask ? { withAnimation(Motion.settle) { store.toggleDone(task) } } : nil,
+                        onAddSubtask: row.isSubtask ? nil : { beginSubtask(task) })
             .opacity(isDragging ? 0 : 1)
             .overlay { if isDragging { emptySlot } }
             .hairline(10, color: drop == .subtask(task.id) ? .accentColor : .clear,
@@ -185,34 +185,20 @@ struct KanbanView: View {
                                            value: [task.id: geo.frame(in: .named("board"))])
                 }
             }
+            .padding(.leading, row.isSubtask ? subtaskIndent : 0)
+            .overlay(alignment: .leading) {
+                if row.isSubtask {
+                    Capsule().fill(Color.primary.opacity(0.16))
+                        .frame(width: 1.5)
+                        .padding(.vertical, 2).padding(.leading, 11)
+                }
+            }
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
             .animation(Motion.quick, value: drop)
+            .animation(Motion.settle, value: isDragging)
             .gesture(drag(task))
             .onTapGesture { tap(task) }
             .contextMenu { menu(task) }
-    }
-
-    /// 子は一回り細いカードにして右揃え。左端のレールでどの親の子かを示す。
-    private func subtaskGroup(_ parent: Task, _ subs: [Task]) -> some View {
-        VStack(alignment: .trailing, spacing: 8) {
-            ForEach(subs) { sub in
-                card(sub, dragging: dragging?.id == sub.id, isSub: true)
-            }
-            if subtaskParent == parent.id {
-                subtaskComposer(parent)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .top).combined(with: .opacity),
-                        removal: .opacity.combined(with: .scale(scale: 0.97))))
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.leading, subtaskIndent)
-        .overlay(alignment: .leading) {
-            Capsule()
-                .fill(Color.primary.opacity(0.16))
-                .frame(width: 1.5)
-                .padding(.vertical, 2)
-                .padding(.leading, 11)
-        }
     }
 
     /// 子カードの左インデント。この差がそのまま親との幅の差になる。
@@ -285,51 +271,43 @@ struct KanbanView: View {
     }
 
     /// 開始時に盤面を写し取る。以後はこのスナップショットだけで判定する。
+    /// 並びは描画と同じ ColumnLayout から作るので、両者がずれない。
     @discardableResult
     private func begin(_ task: Task, at start: CGPoint) -> BoardDrag {
         let own = Set(store.subtasks(of: task).map(\.id) + [task.id])
-        let grouped = groupedTasks()          // 開始時に1回だけ
+        let layouts = columnLayouts()
         var order: [Status: [BoardDrag.Row]] = [:]
         var parentCount: [Status: Int] = [:]
+        var missing = 0
 
         for status in visibleColumns {
-            let parents = grouped[status] ?? []
-            parentCount[status] = parents.count
+            guard let layout = layouts[status] else { continue }
+            parentCount[status] = layout.parents.count
             var rows: [BoardDrag.Row] = []
-            for (index, parent) in parents.enumerated() {
-                // 画面に出ている順（親 → その子）で積む。
-                // 子を入れ忘れると、その高さぶんが判定の空白になる。
-                if !own.contains(parent.id), let f = cardFrames[parent.id] {
-                    rows.append(.init(id: parent.id, frame: f,
-                                      canBeParent: true, insertBefore: index))
-                }
-                for child in store.subtasks(of: parent) {
-                    if !own.contains(child.id), let f = cardFrames[child.id] {
-                        // 子の位置に落としたら、その親の「次」に入る
-                        rows.append(.init(id: child.id, frame: f,
-                                          canBeParent: false, insertBefore: index + 1))
-                    }
-                }
+            for row in layout.rows where !own.contains(row.task.id) {
+                guard let frame = cardFrames[row.task.id] else { missing += 1; continue }
+                rows.append(.init(id: row.task.id, frame: frame,
+                                  canBeParent: !row.isSubtask,
+                                  insertBefore: row.insertBefore))
             }
-            order[status] = rows.sorted { $0.frame.minY < $1.frame.minY }
+            order[status] = rows
         }
 
         let frame = cardFrames[task.id]
         let center = CGPoint(x: frame?.midX ?? start.x, y: frame?.midY ?? start.y)
         let fallbackWidth = max((frames[task.status]?.width ?? 280) - 20, 160)
-        let visible = frames.filter { visibleColumns.contains($0.key) }
 
         let made = BoardDrag(task: task,
                              grabOffset: CGSize(width: center.x - start.x,
                                                 height: center.y - start.y),
                              cardWidth: frame?.width ?? fallbackWidth,
-                             columns: visible,
+                             columns: frames.filter { visibleColumns.contains($0.key) },
                              order: order,
                              parentCount: parentCount)
         session = made
         grabOffset = made.grabOffset
         withAnimation(Motion.lift) { dragging = task }
-        DragLog.begin(made, cardFramesCount: cardFrames.count, start: start)
+        DragLog.begin(made, missingFrames: missing, start: start)
         return made
     }
 
@@ -362,7 +340,8 @@ struct KanbanView: View {
 
     /// 落とした位置に居座らせる。上の隣と同じ日時に揃えたうえで、手動の並び順を挟み込む。
     private func reorder(_ moving: [Task], in status: Status, to index: Int) {
-        let others = tasks(status).filter { t in !moving.contains { $0.id == t.id } }
+        let parents = columnLayouts()[status]?.parents ?? []
+        let others = parents.filter { t in !moving.contains { $0.id == t.id } }
         let above = index > 0 ? others[safe: index - 1] : nil
         let below = others[safe: index]
         let lower = above?.manualOrder ?? ((below?.manualOrder ?? 0) - 2)
@@ -709,8 +688,9 @@ struct KanbanView: View {
 
     // MARK: - データ
 
-    /// 盤面ぶんの絞り込みと並べ替えを1回で済ませ、ステータスごとに振り分ける。
-    private func groupedTasks() -> [Status: [Task]] {
+    /// 盤面ぶんの絞り込みと並べ替えを1回で済ませ、列ごとの並びを組み立てる。
+    /// 描画・ドロップ判定・並べ替えは、すべてこの結果だけを見る。
+    private func columnLayouts() -> [Status: ColumnLayout] {
         let filter = Filter(period: state.period,
                             profileIDs: state.visibleProfiles(of: store.doc.profiles.map(\.id)),
                             calendar: settings.calendar, sort: settings.sortRule,
@@ -722,7 +702,13 @@ struct KanbanView: View {
         if state.period != .completed, settings.doneRetentionDays >= 0 {
             grouped[.done] = trimmedDone(grouped[.done] ?? [])
         }
-        return grouped
+        var layouts: [Status: ColumnLayout] = [:]
+        for status in visibleColumns {
+            layouts[status] = ColumnLayout(status: status,
+                                           parents: grouped[status] ?? [],
+                                           children: { store.subtasks(of: $0) })
+        }
+        return layouts
     }
 
     /// Done列に残す範囲。0日なら完了した時点で隠す。
@@ -731,9 +717,5 @@ struct KanbanView: View {
         let limit = settings.calendar.date(byAdding: .day,
                                            value: -settings.doneRetentionDays, to: Date())
         return items.filter { ($0.completedAt ?? $0.due) >= (limit ?? .distantPast) }
-    }
-
-    private func tasks(_ status: Status) -> [Task] {
-        groupedTasks()[status] ?? []
     }
 }

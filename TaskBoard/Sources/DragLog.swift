@@ -7,11 +7,11 @@ enum DragLog {
     private static let url = FileManager.default.temporaryDirectory
         .appendingPathComponent("taskboard-drag.log")
 
-    static func begin(_ drag: BoardDrag, cardFramesCount: Int, start: CGPoint) {
+    static func begin(_ drag: BoardDrag, missingFrames: Int, start: CGPoint) {
         guard enabled else { return }
         var lines = ["--- 開始 \(stamp()) ---",
                      "掴んだ点: \(fmt(start))  掴んだタスク: \(drag.task.title)",
-                     "収集済みカード枠: \(cardFramesCount)"]
+                     "座標が取れなかった行: \(missingFrames)"]
         for (status, rect) in drag.columns.sorted(by: { $0.value.minX < $1.value.minX }) {
             let rows = drag.order[status] ?? []
             lines.append("  列 \(status.rawValue): \(fmt(rect)) / 判定対象 \(rows.count)件")

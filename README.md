@@ -65,7 +65,8 @@ xattr -dr com.apple.quarantine /Applications/TaskBoard.app
 
 ```bash
 swiftc -O TaskBoard/Sources/Models.swift TaskBoard/Sources/Filters.swift \
-       TaskBoard/Sources/BoardDrag.swift Tests/main.swift -o /tmp/droptest && /tmp/droptest
+       TaskBoard/Sources/ColumnLayout.swift TaskBoard/Sources/BoardDrag.swift \
+       Tests/main.swift -o /tmp/droptest && /tmp/droptest
 ```
 
 ## 構成
@@ -75,6 +76,7 @@ swiftc -O TaskBoard/Sources/Models.swift TaskBoard/Sources/Filters.swift \
 | `Models.swift` | Task / Profile / Status / Priority / Repeat |
 | `Store.swift` | JSON の読み書き、外部編集の監視、サブタスクの索引 |
 | `Filters.swift` | 期間・プロファイルの絞り込みと並べ替え |
+| `ColumnLayout.swift` | 列に出す行の並び。描画・判定・並べ替えが共有する唯一の元 |
 | `BoardDrag.swift` | ドラッグ中の当たり判定（純粋関数・テスト対象） |
 | `KanbanView.swift` | カンバン本体、インライン追加、複数選択 |
 | `CardView.swift` | カード1枚。各要素がその場で編集できる |
