@@ -100,6 +100,8 @@ final class AppSettings {
     var defaultDue: DefaultDue { didSet { put(defaultDue.rawValue, "defaultDue") } }
     var defaultProfileID: String { didSet { put(defaultProfileID, "defaultProfileID") } }
     var defaultStatus: Status { didSet { put(defaultStatus.rawValue, "defaultStatus") } }
+    /// 時刻を決めずに作ったタスクは終日として記録する
+    var defaultAllDay: Bool { didSet { put(defaultAllDay, "defaultAllDay") } }
 
     static let defaultPriorityHex: [Int: String] = [1: "#8E8E93", 2: "#FFCC00", 3: "#FF3B30"]
 
@@ -125,6 +127,7 @@ final class AppSettings {
         defaultDue = DefaultDue(rawValue: d.string(forKey: "defaultDue") ?? "") ?? .today
         defaultProfileID = d.string(forKey: "defaultProfileID") ?? ""
         defaultStatus = Status(rawValue: d.string(forKey: "defaultStatus") ?? "") ?? .inbox
+        defaultAllDay = d.object(forKey: "defaultAllDay") as? Bool ?? true
     }
 
     /// 保存順にならべた期間タブ。未知・欠落があっても既定順で補う。

@@ -448,14 +448,18 @@ struct KanbanView: View {
             .tint(Color.secondary)
 
             if draftTask.allDay {
-                Text("その日中").font(.caption)
+                Button("その日中") { setTimed() }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .help("クリックすると時刻を決められます")
             } else {
                 DatePicker("", selection: $draftTask.due, displayedComponents: .hourAndMinute)
                     .datePickerStyle(.compact)
                     .labelsHidden()
                     .font(.caption)
             }
-            Button { draftTask.allDay.toggle() } label: {
+            Button { if draftTask.allDay { setTimed() } else { draftTask.allDay = true } } label: {
                 Image(systemName: draftTask.allDay ? "clock.badge.xmark" : "clock")
                     .font(.caption)
             }
@@ -554,6 +558,17 @@ struct KanbanView: View {
         return f.string(from: draftTask.due)
     }
 
+    /// 終日から時間ありへ。時刻はプロファイルの既定値を使う。
+    private func setTimed() {
+        draftTask.allDay = false
+        let profile = store.profile(draftTask.profileID)
+        let parts = profile.defaultTime.split(separator: ":").compactMap { Int($0) }
+        guard parts.count == 2,
+              let d = settings.calendar.date(bySettingHour: parts[0], minute: parts[1],
+                                             second: 0, of: draftTask.due) else { return }
+        draftTask.due = d
+    }
+
     private func setDraftDay(_ day: Date) {
         let cal = settings.calendar
         let time = cal.dateComponents([.hour, .minute], from: draftTask.due)
@@ -641,7 +656,7 @@ struct KanbanView: View {
                                       second: 0, of: base) ?? base)
             : base
         return Task(title: "", status: .inbox, priority: settings.defaultPriority,
-                    profileID: profileID, due: due)
+                    profileID: profileID, due: due, allDay: settings.defaultAllDay)
     }
 
     // MARK: - データ

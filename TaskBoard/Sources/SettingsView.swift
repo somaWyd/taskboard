@@ -276,12 +276,13 @@ struct DefaultsSettings: View {
                     ForEach([Status.inbox, .next]) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
+                Toggle("時刻を決めずに作ったタスクは終日にする", isOn: $settings.defaultAllDay)
                 Picker("既定の重要度", selection: $settings.defaultPriority) {
                     ForEach(Priority.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
             } footer: {
-                Text("時刻はプロファイルごとの「既定の時刻」を使います。")
+                Text("終日をやめて時刻を入れると、プロファイルごとの「既定の時刻」が入ります。")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

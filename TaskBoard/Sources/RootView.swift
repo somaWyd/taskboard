@@ -60,7 +60,7 @@ struct RootView: View {
         let profile = store.profile(profileID)
         return Task(title: "", status: settings.defaultStatus,
                     priority: settings.defaultPriority, profileID: profileID,
-                    due: defaultDueDate(profile))
+                    due: defaultDueDate(profile), allDay: settings.defaultAllDay)
     }
 
     private func defaultDueDate(_ profile: Profile) -> Date {

@@ -15,6 +15,7 @@ struct CardView: View {
 
     @State private var titleDraft = ""
     @State private var showCalendar = false
+    @State private var showPriority = false
     @State private var memoDraft = ""
     @FocusState private var field: Field?
 
@@ -56,28 +57,51 @@ struct CardView: View {
 
     // MARK: - 重要度
 
+    /// Menu のラベルにすると macOS がボタンのスタイルで色を塗り替えてしまうため、
+    /// 素の図形のまま描いてポップオーバーで選ばせる。
     private var priorityBar: some View {
-        Menu {
-            priorityItems
-        } label: {
-            Rectangle().fill(priorityColor).frame(width: 4)
-        }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .frame(width: 4)
-        .disabled(!editable)
-        .help("重要度")
+        Rectangle()
+            .fill(priorityColor)
+            .frame(width: 4)
+            .contentShape(Rectangle())
+            .onTapGesture { if editable { showPriority = true } }
+            .popover(isPresented: $showPriority, arrowEdge: .trailing) { priorityPicker }
+            .help("重要度")
     }
 
-    @ViewBuilder
-    private var priorityItems: some View {
-        ForEach(Priority.allCases) { p in
-            Button {
-                var t = task; t.priority = p; store.upsert(t)
-            } label: {
-                Label(p.label, systemImage: task.priority == p ? "checkmark.circle.fill" : "circle")
+    private var priorityDot: some View {
+        Circle()
+            .fill(priorityColor)
+            .frame(width: 9, height: 9)
+            .contentShape(Rectangle())
+            .onTapGesture { if editable { showPriority = true } }
+            .popover(isPresented: $showPriority, arrowEdge: .bottom) { priorityPicker }
+            .help("重要度")
+    }
+
+    private var priorityPicker: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Priority.allCases) { p in
+                Button {
+                    var t = task; t.priority = p; store.upsert(t)
+                    showPriority = false
+                } label: {
+                    HStack(spacing: 8) {
+                        Circle().fill(settings.color(for: p)).frame(width: 10, height: 10)
+                        Text(p.label)
+                        Spacer(minLength: 12)
+                        if task.priority == p {
+                            Image(systemName: "checkmark").font(.caption)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                    .padding(.horizontal, 10).padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
             }
         }
+        .padding(4)
+        .frame(width: 140)
     }
 
     // MARK: - タイトル
@@ -95,12 +119,7 @@ struct CardView: View {
                 .buttonStyle(.plain)
             }
             if settings.priorityStyle == .dot || (isSubtask && task.priority != .low) {
-                Menu { priorityItems } label: {
-                    Circle().fill(priorityColor).frame(width: 8, height: 8)
-                }
-                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
-                .tint(priorityColor)
-                .disabled(!editable)
+                priorityDot
             }
 
             if field == .title {
