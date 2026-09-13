@@ -87,8 +87,16 @@ struct Profile: Codable, Identifiable, Hashable {
     var name: String
     var symbol: String
     var colorHex: String
-    /// 新規タスクの既定時刻（"HH:mm"）
+    /// 新規タスクの既定時刻（"HH:mm"）。空なら時刻を決めず、終日として登録する。
     var defaultTime: String
+
+    /// "HH:mm" を時と分に分ける。空や不正なら nil。
+    var defaultHourMinute: (hour: Int, minute: Int)? {
+        let parts = defaultTime.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2, let h = Int(parts[0]), let m = Int(parts[1]),
+              (0...23).contains(h), (0...59).contains(m) else { return nil }
+        return (h, m)
+    }
 
     static let fallback = Profile(id: "inbox", name: "未分類",
                                   symbol: "circle.dashed", colorHex: "#8E8E93",
@@ -161,7 +169,7 @@ struct Task: Codable, Identifiable, Hashable {
 }
 
 /// tasks.json の中身そのもの。
-struct Document: Codable {
+struct Document: Codable, Equatable {
     var version: Int = 1
     var profiles: [Profile]
     var tasks: [Task]

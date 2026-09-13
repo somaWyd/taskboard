@@ -200,7 +200,7 @@ struct SidebarView: View {
 
     private func newProfile() -> Profile {
         let p = Profile(id: "profile-\(UUID().uuidString.prefix(6))", name: "新しいプロファイル",
-                        symbol: "folder.fill", colorHex: "#0A84FF", defaultTime: "09:00")
+                        symbol: "folder.fill", colorHex: "#0A84FF", defaultTime: "")
         store.doc.profiles.append(p)
         store.save()
         return p
@@ -246,7 +246,8 @@ struct ProfileEditor: View {
             Form {
                 TextField("名称", text: $draft.name)
                 LabeledContent("色") { Swatches(selection: $draft.colorHex) }
-                TextField("既定の時刻（HH:mm）", text: $draft.defaultTime)
+                TextField("既定の時刻（任意・HH:mm）", text: $draft.defaultTime,
+                      prompt: Text("空欄なら終日"))
                 if let error {
                     Text(error).font(.caption).foregroundStyle(.red)
                 }
@@ -272,10 +273,12 @@ struct ProfileEditor: View {
     private func save() {
         let name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { error = "名称を入力してください"; return }
-        guard isValidTime(draft.defaultTime) else {
-            error = "既定の時刻は HH:mm で入力してください（例 09:30）"
+        let time = draft.defaultTime.trimmingCharacters(in: .whitespaces)
+        guard time.isEmpty || isValidTime(time) else {
+            error = "既定の時刻は HH:mm で入力してください（例 09:30）。空欄なら終日になります"
             return
         }
+        draft.defaultTime = time
         draft.name = name
         if let i = store.doc.profiles.firstIndex(where: { $0.id == draft.id }) {
             store.doc.profiles[i] = draft

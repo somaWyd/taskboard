@@ -24,7 +24,9 @@ struct RootView: View {
 
     private var main: some View {
         @Bindable var state = state
-        return NavigationSplitView {
+        return NavigationSplitView(columnVisibility: Binding(
+            get: { state.sidebarVisible ? .all : .detailOnly },
+            set: { state.sidebarVisible = ($0 != .detailOnly) })) {
             SidebarView()
                 .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 260)
         } detail: {
@@ -60,15 +62,15 @@ struct RootView: View {
         let profile = store.profile(profileID)
         return Task(title: "", status: settings.defaultStatus,
                     priority: settings.defaultPriority, profileID: profileID,
-                    due: defaultDueDate(profile), allDay: settings.defaultAllDay)
+                    due: defaultDueDate(profile),
+                    allDay: profile.defaultHourMinute == nil ? true : settings.defaultAllDay)
     }
 
     private func defaultDueDate(_ profile: Profile) -> Date {
         let base = settings.defaultDue.date()
-        let parts = profile.defaultTime.split(separator: ":").compactMap { Int($0) }
-        let cal = settings.calendar
-        guard parts.count == 2,
-              let d = cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: base)
+        guard let hm = profile.defaultHourMinute,
+              let d = settings.calendar.date(bySettingHour: hm.hour, minute: hm.minute,
+                                             second: 0, of: base)
         else { return base }
         return d
     }

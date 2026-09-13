@@ -11,6 +11,18 @@ final class Store {
     /// 親ID → サブタスク。毎カードで全件を走査しないための索引。
     private(set) var childIndex: [UUID: [Task]] = [:]
 
+    /// 取り消し用の履歴。保存のたびに直前の内容を積む。
+    private var undoStack: [Document] = []
+    private var redoStack: [Document] = []
+    /// 直前に保存した内容。差分を見て履歴に積むために持つ。
+    private var previous: Document?
+    /// 取り消し中は履歴を積まない
+    private var restoring = false
+    private static let historyLimit = 40
+
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
     private var watcher: DispatchSourceFileSystemObject?
     private var saving = false
     private static let folderKey = "storeFolderPath"
@@ -52,6 +64,7 @@ final class Store {
         do {
             let data = try Data(contentsOf: url)
             doc = try Self.decoder.decode(Document.self, from: data)
+            previous = doc                 // 読み込み直後を履歴の起点にする
             rebuildIndex()
             loadError = nil
         } catch {
@@ -61,6 +74,7 @@ final class Store {
     }
 
     func save() {
+        recordHistory()
         rebuildIndex()
         guard let url = jsonURL, loadError == nil else { return }
         do {
@@ -92,6 +106,36 @@ final class Store {
         let doc = folder.appendingPathComponent("CLAUDE.md")
         guard !FileManager.default.fileExists(atPath: doc.path) else { return }
         try? Self.schemaDoc.data(using: .utf8)?.write(to: doc, options: .atomic)
+    }
+
+    private func recordHistory() {
+        defer { previous = doc }
+        guard !restoring, let previous, previous != doc else { return }
+        undoStack.append(previous)
+        if undoStack.count > Self.historyLimit { undoStack.removeFirst() }
+        redoStack.removeAll()
+    }
+
+    /// 直前の状態に戻す。
+    func undo() {
+        guard let last = undoStack.popLast() else { return }
+        redoStack.append(doc)
+        restore(last)
+    }
+
+    /// 取り消した操作をやり直す。
+    func redo() {
+        guard let next = redoStack.popLast() else { return }
+        undoStack.append(doc)
+        restore(next)
+    }
+
+    private func restore(_ snapshot: Document) {
+        restoring = true
+        doc = snapshot
+        previous = snapshot
+        save()
+        restoring = false
     }
 
     // MARK: - 外部編集の取り込み

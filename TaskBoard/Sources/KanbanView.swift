@@ -89,6 +89,8 @@ struct KanbanView: View {
         .onPreferenceChange(ColumnProbes.self) { probes = $0 }
         .onPreferenceChange(CardFrames.self) { cardFrames = $0 }
         .onChange(of: state.period) { _, _ in selection = []; composing = nil }
+        .onChange(of: state.composeRequest) { _, _ in startComposing(.inbox) }
+        .onChange(of: state.deleteRequest) { _, _ in deleteSelection() }
     }
 
     /// 列の当たり判定に使う矩形。
@@ -353,6 +355,13 @@ struct KanbanView: View {
         return store.doc.tasks.filter { selection.contains($0.id) }
     }
 
+    /// ⌘⌫ で選択中のタスクをまとめて削除する。
+    private func deleteSelection() {
+        guard !selection.isEmpty else { return }
+        withAnimation(Motion.settle) { store.bulkDelete(selection) }
+        selection = []
+    }
+
     private func endDrag() {
         withAnimation(Motion.settle) {
             dragging = nil; hover = nil; drop = nil; session = nil
@@ -609,10 +618,9 @@ struct KanbanView: View {
     /// 終日から時間ありへ。時刻はプロファイルの既定値を使う。
     private func setTimed() {
         draftTask.allDay = false
-        let profile = store.profile(draftTask.profileID)
-        let parts = profile.defaultTime.split(separator: ":").compactMap { Int($0) }
-        guard parts.count == 2,
-              let d = settings.calendar.date(bySettingHour: parts[0], minute: parts[1],
+        // 既定の時刻が無ければ 09:00 から始める
+        let hm = store.profile(draftTask.profileID).defaultHourMinute ?? (9, 0)
+        guard let d = settings.calendar.date(bySettingHour: hm.hour, minute: hm.minute,
                                              second: 0, of: draftTask.due) else { return }
         draftTask.due = d
     }
@@ -697,12 +705,14 @@ struct KanbanView: View {
         let profileID = store.doc.profiles.first { $0.id == settings.defaultProfileID }?.id
             ?? store.doc.profiles.first?.id ?? Profile.fallback.id
         let profile = store.profile(profileID)
-        let parts = profile.defaultTime.split(separator: ":").compactMap { Int($0) }
         let base = settings.defaultDue.date()
-        let due = parts.count == 2
-            ? (settings.calendar.date(bySettingHour: parts[0], minute: parts[1],
-                                      second: 0, of: base) ?? base)
-            : base
+        // 既定の時刻が無いプロファイルは、時刻を決めず終日にする
+        guard let hm = profile.defaultHourMinute else {
+            return Task(title: "", status: .inbox, priority: settings.defaultPriority,
+                        profileID: profileID, due: base, allDay: true)
+        }
+        let due = settings.calendar.date(bySettingHour: hm.hour, minute: hm.minute,
+                                         second: 0, of: base) ?? base
         return Task(title: "", status: .inbox, priority: settings.defaultPriority,
                     profileID: profileID, due: due, allDay: settings.defaultAllDay)
     }

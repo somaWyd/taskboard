@@ -14,6 +14,7 @@ macOS 26 以降で動く、SwiftUI 製のタスク管理アプリ。カンバン
 - **繰り返し** — 毎日 / 平日 / 毎週 / 毎月 / 毎年 / 曜日指定
 - **期限** — 日時指定のほか「その日中（時刻なし）」に対応
 - **Markdown 出力** — 期間を指定してクリップボードへ
+- **キーボード操作** — ⌘N 追加 / ⌘Z 取り消し / ⌘B サイドバー開閉 / ⌘1〜5 期間切替 など
 - **外観** — ライト / ダーク、マット / リキッドグラス（`glassEffect`）を切替
 
 ## データの置き場所
@@ -37,6 +38,22 @@ xcodebuild -project TaskBoard.xcodeproj -scheme TaskBoard -configuration Release
            -derivedDataPath .build build
 open .build/Build/Products/Release/TaskBoard.app
 ```
+
+## ショートカット
+
+| キー | 動作 |
+|---|---|
+| ⌘N | Inbox にタスクを追加（その場で入力） |
+| ⇧⌘N | 新規タスクを詳細画面で作る |
+| ⌘Z / ⇧⌘Z | 取り消す / やり直す |
+| ⌘⌫ | 選択したタスクを削除 |
+| ⌘B | サイドバーの開閉 |
+| ⌘1〜⌘5 | 期間の切替（サイドバーの並び順どおり） |
+| ⌘R | ファイルを再読み込み |
+| ⇧⌘C | Markdown をコピー |
+| ⌘, | 設定 |
+| Return | 入力中のタスクを登録 |
+| Esc | 選択解除 / 入力の取り消し |
 
 ## インストール（dmg を作る）
 

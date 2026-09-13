@@ -44,9 +44,8 @@ expect("空の列 Next → 先頭に挿入",
        s.drop(at: CGPoint(x: 300, y: 300)), .insert(.next, 0))
 expect("列の隙間(x=210) → 近いほうの列へ寄せる",
        s.drop(at: CGPoint(x: 210, y: 300)), .insert(.inbox, 2))
-// 列は画面の下まで伸びているので、下方向は制限しない（横位置で列が決まる）
-expect("列の下の方 → その列の末尾",
-       s.drop(at: CGPoint(x: 100, y: 900)), .insert(.inbox, 2))
+expect("盤外（遠く下） → なし",
+       s.drop(at: CGPoint(x: 100, y: 900)), nil)
 
 print(failures == 0 ? "\nドロップ種別: 全て通過" : "\nドロップ種別: 失敗 \(failures) 件")
 
@@ -78,7 +77,7 @@ expectCol("Next の少し上（箱の外）", CGPoint(x: 320, y: -30), .next)
 expectCol("Inbox と Next の隙間（Next寄り）", CGPoint(x: 215, y: 300), .next)
 expectCol("Inbox と Next の隙間（Inbox寄り）", CGPoint(x: 205, y: 300), .inbox)
 expectCol("Done の中央", CGPoint(x: 540, y: 300), .done)
-expectCol("列の下の方はその列のまま", CGPoint(x: 320, y: 900), .next)
+expectCol("盤の遥か下", CGPoint(x: 320, y: 900), nil)
 print(f2 == 0 ? "\n列の判定: 全て通過" : "\n列の判定: 失敗 \(f2) 件")
 
 // --- プロファイルの絞り込み（nil=全部 / 集合=そのぶんだけ / 空=0件） ---
@@ -269,4 +268,25 @@ expectBox("列より上（受け付けない）", CGPoint(x: 860, y: -100), nil)
 expectBox("右にはみ出す → 近いDone", CGPoint(x: 2000, y: 500), .done)
 print(f8 == 0 ? "\n箱の中はどこでも: 全て通過" : "\n箱の中はどこでも: 失敗 \(f8) 件")
 
-exit((failures + f2 + f3 + f4 + f5 + f6 + f7 + f8) == 0 ? 0 : 1)
+
+// --- プロファイルの既定時刻は任意 ---
+print("\n--- 既定の時刻（任意） ---")
+var f9 = 0
+func checkTime(_ label: String, _ ok: Bool) {
+    if !ok { f9 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label)")
+}
+func prof(_ time: String) -> Profile {
+    Profile(id: "p", name: "p", symbol: "c", colorHex: "#0A84FF", defaultTime: time)
+}
+checkTime("空欄 → 時刻なし", prof("").defaultHourMinute == nil)
+checkTime("空白だけ → 時刻なし", prof("   ").defaultHourMinute == nil)
+checkTime("09:30 → 9時30分", prof("09:30").defaultHourMinute.map { $0 == (9, 30) } ?? false)
+checkTime("23:59 → 23時59分", prof("23:59").defaultHourMinute.map { $0 == (23, 59) } ?? false)
+checkTime("24:00 → 不正なので時刻なし", prof("24:00").defaultHourMinute == nil)
+checkTime("09:60 → 不正なので時刻なし", prof("09:60").defaultHourMinute == nil)
+checkTime("9時 → 不正なので時刻なし", prof("9時").defaultHourMinute == nil)
+checkTime("0:00 → 0時0分", prof("0:00").defaultHourMinute.map { $0 == (0, 0) } ?? false)
+print(f9 == 0 ? "\n既定の時刻: 全て通過" : "\n既定の時刻: 失敗 \(f9) 件")
+
+exit((failures + f2 + f3 + f4 + f5 + f6 + f7 + f8 + f9) == 0 ? 0 : 1)
