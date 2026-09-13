@@ -83,6 +83,12 @@ struct SidebarView: View {
                         .strokeBorder(Color(hex: profile.colorHex),
                                       lineWidth: isDefault ? 1.5 : 0)
                 }
+                // アイコンだけは別の役割。押すと既定のプロファイルになる
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    withAnimation(Motion.quick) { settings.defaultProfileID = profile.id }
+                }
+                .help(isDefault ? "既定のプロファイル" : "クリックして既定にする")
             Text(profile.name).lineLimit(1)
             if isDefault {
                 Text("デフォルト").font(.caption).foregroundStyle(.tertiary)
