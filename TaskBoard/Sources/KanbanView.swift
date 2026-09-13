@@ -14,6 +14,31 @@ private struct ColumnFrames: PreferenceKey {
     }
 }
 
+/// ドラッグ中のカーソル位置だけを持つ。盤面本体がこれを読まないので、
+/// 指を動かしただけでカンバン全体が描き直されることがなくなる。
+@Observable
+final class DragPointModel {
+    var point: CGPoint = .zero
+}
+
+/// カーソルに追従するゴースト。座標を読むのはこのビューだけ。
+struct GhostLayer: View {
+    let model: DragPointModel
+    let task: Task
+    let width: CGFloat
+    let offset: CGSize
+
+    var body: some View {
+        CardView(task: task, ghost: true)
+            .frame(width: width)
+            .fixedSize(horizontal: false, vertical: true)
+            .scaleEffect(1.03)
+            .rotationEffect(.degrees(1.2))
+            .position(x: model.point.x + offset.width, y: model.point.y + offset.height)
+            .allowsHitTesting(false)
+    }
+}
+
 struct KanbanView: View {
     @Environment(Store.self) private var store
     @Environment(AppSettings.self) private var settings
@@ -21,7 +46,7 @@ struct KanbanView: View {
 
     @State private var frames: [Status: CGRect] = [:]
     @State private var dragging: Task?
-    @State private var dragPoint: CGPoint = .zero
+    @State private var dragModel = DragPointModel()
     @State private var grabOffset: CGSize = .zero
     @State private var hover: Status?
     @State private var cardFrames: [UUID: CGRect] = [:]
@@ -42,19 +67,16 @@ struct KanbanView: View {
     var body: some View {
         ZStack(alignment: .topLeading) {
             HStack(alignment: .top, spacing: 12) {
-                ForEach(visibleColumns, id: \.self) { column($0) }
+                let grouped = groupedTasks()
+                ForEach(visibleColumns, id: \.self) { status in
+                    column(status, items: grouped[status] ?? [])
+                }
             }
             .padding(14)
 
             if let dragging {
-                CardView(task: dragging, ghost: true)
-                    .frame(width: session?.cardWidth ?? 260)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .scaleEffect(1.03)
-                    .rotationEffect(.degrees(1.2))
-                    .position(x: dragPoint.x + grabOffset.width,
-                              y: dragPoint.y + grabOffset.height)
-                    .allowsHitTesting(false)
+                GhostLayer(model: dragModel, task: dragging,
+                           width: session?.cardWidth ?? 260, offset: grabOffset)
                     .transition(.opacity)
             }
         }
@@ -74,9 +96,8 @@ struct KanbanView: View {
 
     // MARK: - 列
 
-    private func column(_ status: Status) -> some View {
-        let items = tasks(status)
-        return VStack(alignment: .leading, spacing: 0) {
+    private func column(_ status: Status, items: [Task]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
             header(status, count: items.count)
             GeometryReader { geo in
                 ScrollView {
@@ -241,7 +262,7 @@ struct KanbanView: View {
         DragGesture(minimumDistance: 5, coordinateSpace: .named("board"))
             .onChanged { value in
                 if session == nil { begin(task, at: value.startLocation) }
-                dragPoint = value.location
+                dragModel.point = value.location
                 let next = session?.drop(at: value.location)
                 if next != drop { drop = next }
                 hover = hoverColumn(for: next)
@@ -265,8 +286,9 @@ struct KanbanView: View {
     private func begin(_ task: Task, at start: CGPoint) {
         let own = Set(store.subtasks(of: task).map(\.id) + [task.id])
         var order: [Status: [(id: UUID, frame: CGRect, canBeParent: Bool)]] = [:]
+        let grouped = groupedTasks()          // 開始時に1回だけ
         for status in visibleColumns {
-            order[status] = tasks(status).compactMap { t in
+            order[status] = (grouped[status] ?? []).compactMap { t in
                 guard let f = cardFrames[t.id], !own.contains(t.id) else { return nil }
                 return (t.id, f, !t.isSubtask)
             }
@@ -661,20 +683,30 @@ struct KanbanView: View {
 
     // MARK: - データ
 
-    private func tasks(_ status: Status) -> [Task] {
+    /// 盤面ぶんの絞り込みと並べ替えを1回で済ませ、ステータスごとに振り分ける。
+    private func groupedTasks() -> [Status: [Task]] {
         let filter = Filter(period: state.period, profileIDs: state.activeProfiles,
                             calendar: settings.calendar, sort: settings.sortRule,
                             profileOrder: store.doc.profiles.map(\.id))
-        var items = filter.apply(store.doc.tasks).filter { $0.status == status }
-        if status == .done, state.period != .completed, settings.doneRetentionDays >= 0 {
-            if settings.doneRetentionDays == 0 {
-                items = []                       // 完了したら即座に隠す
-            } else {
-                let limit = settings.calendar.date(byAdding: .day,
-                                                   value: -settings.doneRetentionDays, to: Date())
-                items = items.filter { ($0.completedAt ?? $0.due) >= (limit ?? .distantPast) }
-            }
+        var grouped: [Status: [Task]] = [:]
+        for task in filter.apply(store.doc.tasks) {
+            grouped[task.status, default: []].append(task)
         }
-        return items
+        if state.period != .completed, settings.doneRetentionDays >= 0 {
+            grouped[.done] = trimmedDone(grouped[.done] ?? [])
+        }
+        return grouped
+    }
+
+    /// Done列に残す範囲。0日なら完了した時点で隠す。
+    private func trimmedDone(_ items: [Task]) -> [Task] {
+        guard settings.doneRetentionDays > 0 else { return [] }
+        let limit = settings.calendar.date(byAdding: .day,
+                                           value: -settings.doneRetentionDays, to: Date())
+        return items.filter { ($0.completedAt ?? $0.due) >= (limit ?? .distantPast) }
+    }
+
+    private func tasks(_ status: Status) -> [Task] {
+        groupedTasks()[status] ?? []
     }
 }

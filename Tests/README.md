@@ -5,7 +5,7 @@
 ```bash
 cd "$(git rev-parse --show-toplevel)"
 swiftc -O TaskBoard/Sources/Models.swift TaskBoard/Sources/BoardDrag.swift \
-       Tests/DropRulesTests.swift -o /tmp/droptest && /tmp/droptest
+       Tests/main.swift -o /tmp/droptest && /tmp/droptest
 ```
 
 全ケース通過で終了コード0、失敗があれば1を返す。
