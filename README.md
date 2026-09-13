@@ -66,7 +66,7 @@ xattr -dr com.apple.quarantine /Applications/TaskBoard.app
 ```bash
 swiftc -O TaskBoard/Sources/Models.swift TaskBoard/Sources/Filters.swift \
        TaskBoard/Sources/ColumnLayout.swift TaskBoard/Sources/BoardDrag.swift \
-       Tests/main.swift -o /tmp/droptest && /tmp/droptest
+       Tests/ColumnRectsMirror.swift Tests/main.swift -o /tmp/droptest && /tmp/droptest
 ```
 
 ## 構成

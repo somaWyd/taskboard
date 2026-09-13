@@ -7,13 +7,6 @@ private struct CardFrames: PreferenceKey {
     }
 }
 
-private struct ColumnFrames: PreferenceKey {
-    static var defaultValue: [Status: CGRect] = [:]
-    static func reduce(value: inout [Status: CGRect], nextValue: () -> [Status: CGRect]) {
-        value.merge(nextValue()) { _, new in new }
-    }
-}
-
 /// ドラッグ中のカーソル位置だけを持つ。盤面本体がこれを読まないので、
 /// 指を動かしただけでカンバン全体が描き直されることがなくなる。
 @Observable
@@ -42,7 +35,7 @@ struct KanbanView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(AppState.self) private var state
 
-    @State private var frames: [Status: CGRect] = [:]
+    @State private var boardSize: CGSize = .zero
     @State private var dragging: Task?
     @State private var dragModel = DragPointModel()
     @State private var grabOffset: CGSize = .zero
@@ -83,9 +76,32 @@ struct KanbanView: View {
             if !selection.isEmpty { withAnimation(Motion.quick) { selection = [] } }
             else if composing != nil { cancelComposing() }
         }
-        .onPreferenceChange(ColumnFrames.self) { frames = $0 }
+        .background {
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { boardSize = geo.size }
+                    .onChange(of: geo.size) { _, size in boardSize = size }
+            }
+        }
         .onPreferenceChange(CardFrames.self) { cardFrames = $0 }
         .onChange(of: state.period) { _, _ in selection = []; composing = nil }
+    }
+
+    /// 列の矩形。HStack の余白14pt・間隔12pt・等幅という配置から計算する。
+    /// 実測値を別に集めると、片方だけ古くなったときに気づけない。
+    private func columnRects() -> [Status: CGRect] {
+        let cols = visibleColumns
+        guard !cols.isEmpty, boardSize.width > 0 else { return [:] }
+        let pad: CGFloat = 14, gap: CGFloat = 12
+        let width = (boardSize.width - pad * 2 - gap * CGFloat(cols.count - 1))
+            / CGFloat(cols.count)
+        guard width > 0 else { return [:] }
+        var rects: [Status: CGRect] = [:]
+        for (i, status) in cols.enumerated() {
+            rects[status] = CGRect(x: pad + (width + gap) * CGFloat(i), y: pad,
+                                   width: width, height: max(boardSize.height - pad * 2, 0))
+        }
+        return rects
     }
 
     private var visibleColumns: [Status] {
@@ -135,12 +151,6 @@ struct KanbanView: View {
         .panel(settings.surface, radius: 12)
         .hairline(12, color: hover == status ? .accentColor : .clear,
                   width: hover == status ? 2 : 0)
-        .background {
-            GeometryReader { geo in
-                Color.clear.preference(key: ColumnFrames.self,
-                                       value: [status: geo.frame(in: .named("board"))])
-            }
-        }
         .animation(Motion.quick, value: hover)
     }
 
@@ -292,7 +302,8 @@ struct KanbanView: View {
 
         let frame = cardFrames[task.id]
         let center = CGPoint(x: frame?.midX ?? start.x, y: frame?.midY ?? start.y)
-        let fallbackWidth = max((frames[task.status]?.width ?? 280) - 20, 160)
+        let rects = columnRects()
+        let fallbackWidth = max((rects[task.status]?.width ?? 280) - 20, 160)
 
         let made = BoardDrag(task: task,
                              // 横方向はカーソル中央に固定する。掴んだ位置のずれを
@@ -301,7 +312,7 @@ struct KanbanView: View {
                              grabOffset: CGSize(width: 0,
                                                 height: center.y - start.y),
                              cardWidth: frame?.width ?? fallbackWidth,
-                             columns: frames.filter { visibleColumns.contains($0.key) },
+                             columns: rects,
                              order: order,
                              parentCount: parentCount)
         session = made

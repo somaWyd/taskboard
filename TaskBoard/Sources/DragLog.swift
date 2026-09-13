@@ -16,7 +16,12 @@ enum DragLog {
             let rows = drag.order[status] ?? []
             lines.append("  列 \(status.rawValue): \(fmt(rect)) / 判定対象 \(rows.count)件")
             for r in rows {
-                lines.append("    \(fmt(r.frame)) 親可:\(r.canBeParent)")
+                // カードが列からはみ出していたら、どちらかの座標が古い。
+                // 今回の不具合はこれを見落として長引いた。
+                let inside = rect.insetBy(dx: -2, dy: -2).contains(CGPoint(x: r.frame.midX,
+                                                                          y: r.frame.midY))
+                lines.append("    \(fmt(r.frame)) 親可:\(r.canBeParent)"
+                             + (inside ? "" : "  ← 列からはみ出している（座標の不一致）"))
             }
         }
         append(lines)

@@ -212,4 +212,29 @@ expectEdge("隙間の中央より右", 208, .next)
 expectEdge("右列の内側", 213, .next)
 print(f6 == 0 ? "\n列の境目: 全て通過" : "\n列の境目: 失敗 \(f6) 件")
 
-exit((failures + f2 + f3 + f4 + f5 + f6) == 0 ? 0 : 1)
+
+// --- 列の矩形が盤面いっぱいを隙間なく覆うか ---
+print("\n--- 列の矩形の計算 ---")
+var f7 = 0
+func checkCols(_ label: String, _ ok: Bool) {
+    if !ok { f7 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label)")
+}
+for (w, n) in [(900.0, 3), (1920.0, 3), (1200.0, 2), (400.0, 3)] {
+    let rs = columnRects(boardWidth: w, boardHeight: 800, count: n)
+    guard rs.count == n else { checkCols("幅\(Int(w)) 列\(n): 生成できない", false); continue }
+    let leftOK = abs(rs[0].minX - 14) < 0.01
+    let rightOK = abs(rs[n-1].maxX - (w - 14)) < 0.01
+    var gapsOK = true
+    for i in 1..<n { if abs(rs[i].minX - rs[i-1].maxX - 12) > 0.01 { gapsOK = false } }
+    let sameWidth = rs.allSatisfy { abs($0.width - rs[0].width) < 0.01 }
+    checkCols("幅\(Int(w)) 列\(n): 左端14pt/右端まで/間隔12pt/等幅",
+              leftOK && rightOK && gapsOK && sameWidth)
+}
+// カードは必ず列の中に収まる（列の内側10ptに置かれる）
+let r = columnRects(boardWidth: 1920, boardHeight: 800, count: 3)[1]
+let card = CGRect(x: r.minX + 10, y: r.minY + 42, width: r.width - 20, height: 66)
+checkCols("カードは列の内側に収まる", r.contains(card))
+print(f7 == 0 ? "\n列の矩形: 全て通過" : "\n列の矩形: 失敗 \(f7) 件")
+
+exit((failures + f2 + f3 + f4 + f5 + f6 + f7) == 0 ? 0 : 1)
