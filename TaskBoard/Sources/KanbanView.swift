@@ -32,8 +32,6 @@ struct GhostLayer: View {
         CardView(task: task, ghost: true)
             .frame(width: width)
             .fixedSize(horizontal: false, vertical: true)
-            .scaleEffect(1.03)
-            .rotationEffect(.degrees(1.2))
             .position(x: model.point.x + offset.width, y: model.point.y + offset.height)
             .allowsHitTesting(false)
     }
@@ -113,7 +111,7 @@ struct KanbanView: View {
                                     .padding(.leading, subtaskIndent)
                                     .transition(.asymmetric(
                                         insertion: .move(edge: .top).combined(with: .opacity),
-                                        removal: .opacity.combined(with: .scale(scale: 0.97))))
+                                        removal: .opacity))
                             }
                         }
                         if drop == .insert(status, layout.endIndex) { insertionLine }
@@ -121,13 +119,13 @@ struct KanbanView: View {
                             composer(status)
                                 .transition(.asymmetric(
                                     insertion: .move(edge: .top).combined(with: .opacity),
-                                    removal: .opacity.combined(with: .scale(scale: 0.97))))
+                                    removal: .opacity))
                         }
                         addTarget(status, empty: layout.isEmpty && composing != status)
                     }
                     .frame(minHeight: geo.size.height, alignment: .top)
                     .background { addBackground(status) }
-                    .animation(Motion.settle, value: layout.rows.count)
+                    .animation(Motion.settle, value: layout.rows.map(\.id))
                     .animation(Motion.settle, value: composing)
                 }
             }
@@ -175,10 +173,10 @@ struct KanbanView: View {
                         onToggle: row.isSubtask ? { withAnimation(Motion.settle) { store.toggleDone(task) } } : nil,
                         onAddSubtask: row.isSubtask ? nil : { beginSubtask(task) })
             .opacity(isDragging ? 0 : 1)
+            .animation(nil, value: isDragging)
             .overlay { if isDragging { emptySlot } }
             .hairline(10, color: drop == .subtask(task.id) ? .accentColor : .clear,
                       width: drop == .subtask(task.id) ? 2.5 : 0)
-            .scaleEffect(drop == .subtask(task.id) ? 1.02 : 1)
             .background {
                 GeometryReader { geo in
                     Color.clear.preference(key: CardFrames.self,
@@ -193,9 +191,8 @@ struct KanbanView: View {
                         .padding(.vertical, 2).padding(.leading, 11)
                 }
             }
-            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+            .transition(.opacity)
             .animation(Motion.quick, value: drop)
-            .animation(Motion.settle, value: isDragging)
             .gesture(drag(task))
             .onTapGesture { tap(task) }
             .contextMenu { menu(task) }
