@@ -1,5 +1,15 @@
 import SwiftUI
 
+/// 盤面の大きさ。カードの座標と同じ仕組み（PreferenceKey）で拾う。
+/// onChange(of: geo.size) では初回の値のまま更新されないことがあった。
+private struct BoardSizeKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        let next = nextValue()
+        if next != .zero { value = next }
+    }
+}
+
 private struct CardFrames: PreferenceKey {
     static var defaultValue: [UUID: CGRect] = [:]
     static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
@@ -78,11 +88,10 @@ struct KanbanView: View {
         }
         .background {
             GeometryReader { geo in
-                Color.clear
-                    .onAppear { boardSize = geo.size }
-                    .onChange(of: geo.size) { _, size in boardSize = size }
+                Color.clear.preference(key: BoardSizeKey.self, value: geo.size)
             }
         }
+        .onPreferenceChange(BoardSizeKey.self) { boardSize = $0 }
         .onPreferenceChange(CardFrames.self) { cardFrames = $0 }
         .onChange(of: state.period) { _, _ in selection = []; composing = nil }
     }
@@ -318,7 +327,7 @@ struct KanbanView: View {
         session = made
         grabOffset = made.grabOffset
         withAnimation(Motion.lift) { dragging = task }
-        DragLog.begin(made, missingFrames: missing, start: start)
+        DragLog.begin(made, missingFrames: missing, boardSize: boardSize, start: start)
         return made
     }
 
