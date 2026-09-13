@@ -189,4 +189,27 @@ check("子の行は親候補にならない", built.filter(\.canBeParent).count 
 
 print(f5 == 0 ? "\n並びの一致: 全て通過" : "\n並びの一致: 失敗 \(f5) 件")
 
-exit((failures + f2 + f3 + f4 + f5) == 0 ? 0 : 1)
+
+// --- 列の境目で取り違えないか（間隔12ptを片側6ptずつ埋める） ---
+print("\n--- 列の境目 ---")
+let L = CGRect(x: 0,   y: 0, width: 200, height: 600)
+let R = CGRect(x: 212, y: 0, width: 200, height: 600)   // 間隔12pt
+let edge = BoardDrag(task: task("drag"), grabOffset: .zero, cardWidth: 200,
+                     columns: [.inbox: L, .next: R],
+                     order: [.inbox: [], .next: []],
+                     parentCount: [.inbox: 0, .next: 0])
+var f6 = 0
+func expectEdge(_ label: String, _ x: CGFloat, _ want: Status) {
+    var got: Status? = nil
+    if case .insert(let s, _)? = edge.drop(at: CGPoint(x: x, y: 300)) { got = s }
+    let ok = got == want
+    if !ok { f6 += 1 }
+    print("\(ok ? "OK  " : "NG  ") \(label)(x=\(Int(x))): \(String(describing: got))")
+}
+expectEdge("左列の内側", 199, .inbox)
+expectEdge("隙間の左寄り", 203, .inbox)
+expectEdge("隙間の中央より右", 208, .next)
+expectEdge("右列の内側", 213, .next)
+print(f6 == 0 ? "\n列の境目: 全て通過" : "\n列の境目: 失敗 \(f6) 件")
+
+exit((failures + f2 + f3 + f4 + f5 + f6) == 0 ? 0 : 1)

@@ -295,7 +295,10 @@ struct KanbanView: View {
         let fallbackWidth = max((frames[task.status]?.width ?? 280) - 20, 160)
 
         let made = BoardDrag(task: task,
-                             grabOffset: CGSize(width: center.x - start.x,
+                             // 横方向はカーソル中央に固定する。掴んだ位置のずれを
+                             // 残すと、カードの端を掴んだときにゴーストが隣の列まで
+                             // はみ出し、「見えている場所」と「判定する場所」が食い違う。
+                             grabOffset: CGSize(width: 0,
                                                 height: center.y - start.y),
                              cardWidth: frame?.width ?? fallbackWidth,
                              columns: frames.filter { visibleColumns.contains($0.key) },

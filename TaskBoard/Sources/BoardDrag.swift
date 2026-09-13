@@ -54,7 +54,9 @@ struct BoardDrag {
         guard !boxes.isEmpty else { return nil }
 
         // 1. 箱の中（少し外側まで許容する）
-        if let hit = boxes.first(where: { $0.value.insetBy(dx: -8, dy: -8).contains(point) }) {
+        // 列の間隔は12ptなので、片側6ptずつ広げると隙間をちょうど埋めて重ならない。
+        // 8ptにすると隣同士が4pt重なり、重なった帯では常に左の列が選ばれてしまう。
+        if let hit = boxes.first(where: { $0.value.insetBy(dx: -6, dy: -6).contains(point) }) {
             return hit.key
         }
         // 2. 縦方向が盤に重なっていれば、横位置がいちばん近い列へ
